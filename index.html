@@ -16,7 +16,8 @@ h1{font-size:18px;margin:4px 0 10px}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mut);margin-right:6px}
 .dot.ok{background:var(--ac)}.dot.bad{background:var(--bad)}.dot.wait{background:var(--warn)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:10px}
-#num{width:100%;font-size:26px;text-align:center;background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--tx);padding:8px;outline:0}
+.numrow{display:flex;align-items:center;gap:6px}#bs{background:#20242e;border:0;color:var(--tx);font-size:22px;border-radius:12px;padding:8px 14px}
+#num{flex:1;min-width:0;font-size:26px;text-align:center;background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--tx);padding:8px;outline:0}
 #st{text-align:center;color:var(--mut);font-size:13px;min-height:20px;margin:6px 0}
 .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}
 .pad button{background:#20242e;border:0;color:var(--tx);font-size:22px;padding:14px 0;border-radius:12px}
@@ -35,7 +36,7 @@ input.f{width:100%;background:#0f1115;border:1px solid var(--line);color:var(--t
 <div class="tabs" id="tabs"></div>
 
 <div class="card">
-  <input id="num" inputmode="tel" placeholder="Number" autocomplete="off">
+  <div class="numrow"><input id="num" inputmode="tel" placeholder="Number" autocomplete="off"><button id="bs" title="Delete (hold to clear)">⌫</button></div>
   <div id="st">Pick an account</div>
   <div class="pad" id="pad"></div>
   <div class="row">
@@ -124,13 +125,25 @@ class Sip{
     else if(ev==='calling')this.ui.call('Calling…');
     else if(ev==='ringing')this.ui.call('Ringing…');
     else if(ev==='progress'){if(m.jsep&&this.pc)this.pc.setRemoteDescription(m.jsep).catch(x=>log(x));this.ui.call('Early media…')}
-    else if(ev==='accepted'){if(m.jsep&&this.pc&&this.pc.signalingState!=='stable')this.pc.setRemoteDescription(m.jsep).catch(x=>log(x));this.ui.call('In call ✔',true)}
+    else if(ev==='accepted'){if(m.jsep&&this.pc&&this.pc.signalingState==='have-local-offer')this.pc.setRemoteDescription(m.jsep).catch(x=>log(x));this.ui.call('In call ✔',true)}
     else if(ev==='hangup'){this.ui.state('ok','Ready');this.ui.idle('Call ended'+(r.reason?': '+r.reason:''));this.cleanup()}
     else if(ev==='incomingcall'){this.inJsep=m.jsep;this.ui.incoming(r.displayname||r.username||'Unknown')}
   }
   mkpc(){
-    const pc=new RTCPeerConnection({iceServers:this.a.ice?[{urls:this.a.ice}]:[]});
-    pc.ontrack=e=>{$('#aud').srcObject=e.streams[0]};
+    const a=this.a;
+    const urls=(a.ice||'').split(',').map(x=>x.trim()).filter(Boolean);
+    const srv=urls.length?[Object.assign({urls},a.iceUser?{username:a.iceUser,credential:a.icePass}:{})]:[];
+    const pc=new RTCPeerConnection({iceServers:srv});
+    pc.ontrack=e=>{
+      log('remote track '+e.track.kind);
+      const au=$('#aud');au.srcObject=e.streams[0]||new MediaStream([e.track]);
+      au.play().catch(x=>log('play: '+x));
+    };
+    pc.onicecandidate=e=>{if(e.candidate)log('cand '+e.candidate.type+' '+(e.candidate.address||''))};
+    pc.oniceconnectionstatechange=()=>{
+      log('ICE '+pc.iceConnectionState);
+      if(pc.iceConnectionState==='failed')$('#st').textContent='⚠ Audio link failed (ICE) – TURN login needed?';
+    };
     this.pc=pc;return pc;
   }
   gather(pc){return new Promise(res=>{
@@ -196,7 +209,7 @@ function renderSet(){
   const f=(k,l,t='text')=>`<label>${l}</label><input class="f" type="${t}" data-k="${k}" value="${(a[k]||'').replace(/"/g,'&quot;')}" autocomplete="off">`;
   $('#set').innerHTML=`<div style="margin-top:8px;color:var(--mut);font-size:12px">Editing: ${a.name}</div>`+
     f('name','Label')+f('user','SIP number / username')+f('auth','Auth user (blank = same as number)')+f('secret','SIP secret / password','password')+
-    f('ws','Janus WebSocket URL')+f('host','SIP host:port')+f('ice','STUN/TURN URL');
+    f('ws','Janus WebSocket URL')+f('host','SIP host:port')+f('ice','STUN/TURN URL(s), comma separated')+f('iceUser','TURN username (optional)')+f('icePass','TURN password (optional)','password');
   document.querySelectorAll('#set input').forEach(inp=>inp.oninput=()=>{accts[i][inp.dataset.k]=inp.value;save();tabs()});
 }
 // keypad
@@ -205,6 +218,12 @@ document.querySelectorAll('#pad button').forEach(b=>b.onclick=()=>{
   $('#num').value+=b.dataset.k;
   if(inCall&&cl)cl.dtmf(b.dataset.k);
 });
+(()=>{let t;const bs=$('#bs');
+ const del=()=>{const n=$('#num');n.value=n.value.slice(0,-1)};
+ bs.onpointerdown=()=>{t=setTimeout(()=>{$('#num').value='';t=null},600)};
+ bs.onpointerup=()=>{if(t){clearTimeout(t);del()}};
+ bs.onpointerleave=()=>clearTimeout(t);
+ bs.oncontextmenu=e=>e.preventDefault();})();
 $('#call').onclick=()=>{
   if(!cl){$('#st').textContent='Pick an account first';return}
   const n=$('#num').value.trim().replace(/[^\d+*#]/g,'');

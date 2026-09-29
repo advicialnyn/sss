@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>4-in-1 Dialer</title>
+<style>
+:root{--bg:#0f1115;--card:#181b22;--line:#262a34;--tx:#e8eaf0;--mut:#8b91a1;--ac:#4ade80;--bad:#f87171;--warn:#fbbf24}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px system-ui,sans-serif;padding:12px;max-width:480px;margin:auto}
+h1{font-size:18px;margin:4px 0 10px}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tab{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;color:var(--tx);text-align:left;font-size:14px}
+.tab.on{border-color:var(--ac)}
+.tab small{display:block;color:var(--mut);font-size:12px;margin-top:2px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mut);margin-right:6px}
+.dot.ok{background:var(--ac)}.dot.bad{background:var(--bad)}.dot.wait{background:var(--warn)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:10px}
+#num{width:100%;font-size:26px;text-align:center;background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--tx);padding:8px;outline:0}
+#st{text-align:center;color:var(--mut);font-size:13px;min-height:20px;margin:6px 0}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}
+.pad button{background:#20242e;border:0;color:var(--tx);font-size:22px;padding:14px 0;border-radius:12px}
+.row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
+.row button{border:0;border-radius:12px;padding:14px 0;font-size:15px;color:#fff}
+#call{background:#16a34a}#hang{background:#dc2626}#mute{background:#374151}
+button:disabled{opacity:.4}
+details summary{cursor:pointer;color:var(--mut);font-size:14px}
+label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
+input.f{width:100%;background:#0f1115;border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:8px;font-size:14px}
+#log{font:11px ui-monospace,monospace;color:var(--mut);max-height:130px;overflow:auto;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<h1>📞 4-in-1 Dialer</h1>
+<div class="tabs" id="tabs"></div>
+
+<div class="card">
+  <input id="num" inputmode="tel" placeholder="Number" autocomplete="off">
+  <div id="st">Pick an account</div>
+  <div class="pad" id="pad"></div>
+  <div class="row">
+    <button id="call">Call</button>
+    <button id="mute" disabled>Mute</button>
+    <button id="hang" disabled>Hang up</button>
+  </div>
+</div>
+
+<div class="card" id="incoming" style="display:none">
+  <div id="inwho" style="margin-bottom:8px"></div>
+  <div class="row" style="grid-template-columns:1fr 1fr">
+    <button id="ans" style="background:#16a34a">Answer</button>
+    <button id="dec" style="background:#dc2626">Decline</button>
+  </div>
+</div>
+
+<div class="card">
+  <details id="setbox">
+    <summary>⚙ Account settings (saved only in this browser)</summary>
+    <div id="set"></div>
+  </details>
+</div>
+<div class="card"><details><summary>Log</summary><div id="log"></div></details></div>
+<audio id="aud" autoplay playsinline></audio>
+
+<script>
+const $=s=>document.querySelector(s);
+const HOST='127.0.0.1:5060';
+const DEF=[
+ {name:'Amarip 1',ws:'wss://amarip.net/janus-ws',host:HOST,user:'',auth:'',secret:'',ice:'stun:sip.amarip.net:3478'},
+ {name:'Amarip 2',ws:'wss://amarip.net/janus-ws',host:HOST,user:'',auth:'',secret:'',ice:'stun:sip.amarip.net:3478'},
+ {name:'Webvoice 1',ws:'wss://billing.webvoice.net/janus-ws',host:HOST,user:'',auth:'',secret:'',ice:'stun:stun.l.google.com:19302'},
+ {name:'Webvoice 2',ws:'wss://billing.webvoice.net/janus-ws',host:HOST,user:'',auth:'',secret:'',ice:'stun:stun.l.google.com:19302'}
+];
+let accts;
+try{accts=JSON.parse(localStorage.getItem('dialer4')||'null')}catch(e){}
+if(!accts||accts.length!==4)accts=DEF;
+const save=()=>{try{localStorage.setItem('dialer4',JSON.stringify(accts))}catch(e){}};
+
+function log(t){const l=$('#log');l.textContent+=new Date().toLocaleTimeString()+' '+t+'\n';l.scrollTop=l.scrollHeight}
+
+/* ---------- Janus SIP client ---------- */
+class Sip{
+  constructor(a,ui){this.a=a;this.ui=ui;this.tx={};this.pc=null;this.stream=null;this.muted=false;this.inJsep=null}
+  send(o,cb){
+    o.transaction=Math.random().toString(36).slice(2,12);
+    if(cb)this.tx[o.transaction]=cb;
+    if(this.sid)o.session_id=this.sid;
+    if(this.hid&&o.janus==='message')o.handle_id=this.hid;
+    this.ws.send(JSON.stringify(o));
+  }
+  connect(){
+    const a=this.a;
+    this.ui.state('wait','Connecting…');
+    try{this.ws=new WebSocket(a.ws,'janus-protocol')}catch(e){this.ui.state('bad','Bad WS URL');return}
+    this.ws.onopen=()=>{
+      log('ws open');
+      this.send({janus:'create'},m=>{
+        this.sid=m.data.id;
+        this.ka=setInterval(()=>this.send({janus:'keepalive'}),25000);
+        this.send({janus:'attach',plugin:'janus.plugin.sip'},m2=>{
+          this.hid=m2.data.id;
+          this.send({janus:'message',body:{request:'register',username:`sip:${a.user}@${a.host}`,authuser:a.auth||a.user,display_name:a.user,secret:a.secret,proxy:`sip:${a.host}`}});
+          this.ui.state('wait','Registering…');
+        });
+      });
+    };
+    this.ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch(_){return}
+      log('← '+e.data.slice(0,300));
+      if(m.janus==='error'){this.ui.state('bad',m.error?.reason||'Janus error');return}
+      if(m.transaction&&this.tx[m.transaction]&&m.janus!=='ack'&&m.janus!=='event'){const cb=this.tx[m.transaction];delete this.tx[m.transaction];cb(m);return}
+      if(m.janus==='event')this.onEvent(m);
+    };
+    this.ws.onerror=()=>{log('ws error');this.ui.state('bad','Connection failed')};
+    this.ws.onclose=()=>{clearInterval(this.ka);if(!this.closing)this.ui.state('bad','Disconnected');this.cleanup()};
+  }
+  onEvent(m){
+    const r=m.plugin_data?.data?.result,err=m.plugin_data?.data?.error;
+    if(err){this.ui.state('bad',err);return}
+    if(!r)return;
+    const ev=r.event;
+    if(ev==='registered')this.ui.state('ok','Ready');
+    else if(ev==='registration_failed')this.ui.state('bad','Login failed: '+(r.reason||r.code||''));
+    else if(ev==='calling')this.ui.call('Calling…');
+    else if(ev==='ringing')this.ui.call('Ringing…');
+    else if(ev==='progress'){if(m.jsep&&this.pc)this.pc.setRemoteDescription(m.jsep).catch(x=>log(x));this.ui.call('Early media…')}
+    else if(ev==='accepted'){if(m.jsep&&this.pc&&this.pc.signalingState!=='stable')this.pc.setRemoteDescription(m.jsep).catch(x=>log(x));this.ui.call('In call ✔',true)}
+    else if(ev==='hangup'){this.ui.state('ok','Ready');this.ui.idle('Call ended'+(r.reason?': '+r.reason:''));this.cleanup()}
+    else if(ev==='incomingcall'){this.inJsep=m.jsep;this.ui.incoming(r.displayname||r.username||'Unknown')}
+  }
+  mkpc(){
+    const pc=new RTCPeerConnection({iceServers:this.a.ice?[{urls:this.a.ice}]:[]});
+    pc.ontrack=e=>{$('#aud').srcObject=e.streams[0]};
+    this.pc=pc;return pc;
+  }
+  gather(pc){return new Promise(res=>{
+    if(pc.iceGatheringState==='complete')return res();
+    pc.onicegatheringstatechange=()=>{if(pc.iceGatheringState==='complete')res()};
+    setTimeout(res,3000);
+  })}
+  async mic(pc){
+    this.stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    this.stream.getTracks().forEach(t=>pc.addTrack(t,this.stream));
+  }
+  async call(num){
+    try{
+      const pc=this.mkpc();await this.mic(pc);
+      const o=await pc.createOffer();await pc.setLocalDescription(o);await this.gather(pc);
+      this.send({janus:'message',body:{request:'call',uri:`sip:${num}@${this.a.host}`},jsep:{type:'offer',sdp:pc.localDescription.sdp}});
+      this.ui.call('Dialing…');
+    }catch(e){this.ui.idle('Mic/call error: '+e.message);this.cleanup()}
+  }
+  async answer(){
+    try{
+      const pc=this.mkpc();await this.mic(pc);
+      await pc.setRemoteDescription(this.inJsep);
+      const an=await pc.createAnswer();await pc.setLocalDescription(an);await this.gather(pc);
+      this.send({janus:'message',body:{request:'accept'},jsep:{type:'answer',sdp:pc.localDescription.sdp}});
+    }catch(e){this.ui.idle('Answer error: '+e.message);this.cleanup()}
+  }
+  decline(){this.send({janus:'message',body:{request:'decline'}})}
+  hangup(){this.send({janus:'message',body:{request:'hangup'}})}
+  dtmf(d){this.send({janus:'message',body:{request:'dtmf_info',digit:d}})}
+  toggleMute(){this.muted=!this.muted;this.stream?.getAudioTracks().forEach(t=>t.enabled=!this.muted);return this.muted}
+  cleanup(){
+    try{this.stream?.getTracks().forEach(t=>t.stop())}catch(e){}
+    try{this.pc?.close()}catch(e){}
+    this.pc=null;this.stream=null;this.muted=false;this.inJsep=null;
+    $('#mute').textContent='Mute';
+  }
+  close(){this.closing=true;clearInterval(this.ka);try{this.ws.close()}catch(e){}}
+}
+
+/* ---------- UI ---------- */
+let cur=-1,cl=null,inCall=false,st=[];
+function tabs(){
+  $('#tabs').innerHTML=accts.map((a,i)=>`<button class="tab ${i===cur?'on':''}" data-i="${i}"><span class="dot ${i===cur?(st[0]||''):''}"></span>${a.name}<small>${a.user||'not set'}</small></button>`).join('');
+  document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>pick(+b.dataset.i));
+}
+const ui={
+  state(k,t){st[0]=k;$('#st').textContent=t;tabs()},
+  call(t,connected){inCall=true;$('#st').textContent=t;$('#call').disabled=true;$('#hang').disabled=false;$('#mute').disabled=!connected&&false;$('#mute').disabled=false;$('#incoming').style.display='none'},
+  idle(t){inCall=false;$('#st').textContent=t;$('#call').disabled=false;$('#hang').disabled=true;$('#mute').disabled=true;$('#incoming').style.display='none'},
+  incoming(who){$('#inwho').textContent='📲 Incoming: '+who;$('#incoming').style.display='block'}
+};
+function pick(i){
+  if(inCall){alert('Finish the current call first');return}
+  if(cl){cl.close();cl=null}
+  cur=i;st=[];tabs();renderSet();
+  const a=accts[i];
+  if(!a.user||!a.secret){ui.state('bad','Fill in settings for this account');$('#setbox').open=true;return}
+  cl=new Sip(a,ui);cl.connect();
+}
+function renderSet(){
+  const a=accts[cur<0?0:cur],i=cur<0?0:cur;
+  const f=(k,l,t='text')=>`<label>${l}</label><input class="f" type="${t}" data-k="${k}" value="${(a[k]||'').replace(/"/g,'&quot;')}" autocomplete="off">`;
+  $('#set').innerHTML=`<div style="margin-top:8px;color:var(--mut);font-size:12px">Editing: ${a.name}</div>`+
+    f('name','Label')+f('user','SIP number / username')+f('auth','Auth user (blank = same as number)')+f('secret','SIP secret / password','password')+
+    f('ws','Janus WebSocket URL')+f('host','SIP host:port')+f('ice','STUN/TURN URL');
+  document.querySelectorAll('#set input').forEach(inp=>inp.oninput=()=>{accts[i][inp.dataset.k]=inp.value;save();tabs()});
+}
+// keypad
+$('#pad').innerHTML=['1','2','3','4','5','6','7','8','9','*','0','#'].map(k=>`<button data-k="${k}">${k}</button>`).join('');
+document.querySelectorAll('#pad button').forEach(b=>b.onclick=()=>{
+  $('#num').value+=b.dataset.k;
+  if(inCall&&cl)cl.dtmf(b.dataset.k);
+});
+$('#call').onclick=()=>{
+  if(!cl){$('#st').textContent='Pick an account first';return}
+  const n=$('#num').value.trim().replace(/[^\d+*#]/g,'');
+  if(!n){$('#st').textContent='Enter a number';return}
+  cl.call(n);
+};
+$('#hang').onclick=()=>cl&&cl.hangup();
+$('#mute').onclick=()=>{if(cl)$('#mute').textContent=cl.toggleMute()?'Unmute':'Mute'};
+$('#ans').onclick=()=>cl&&cl.answer();
+$('#dec').onclick=()=>{cl&&cl.decline();$('#incoming').style.display='none'};
+tabs();renderSet();
+</script>
+</body>
+</html>

@@ -32,7 +32,7 @@ input.f{width:100%;background:#0f1115;border:1px solid var(--line);color:var(--t
 </style>
 </head>
 <body>
-<h1>📞 4-in-1 Dialer</h1>
+<h1>📞 4-in-1 Dialer <small style="color:#8b91a1;font-size:11px">v5</small></h1>
 <div class="tabs" id="tabs"></div>
 
 <div class="card">
@@ -60,7 +60,7 @@ input.f{width:100%;background:#0f1115;border:1px solid var(--line);color:var(--t
     <div id="set"></div>
   </details>
 </div>
-<div class="card"><details><summary>Log</summary><div id="log"></div></details></div>
+<div class="card"><details><summary>Log</summary><button id="cp" style="margin:8px 0;padding:8px 12px;border:0;border-radius:8px;background:#374151;color:#fff">Copy log</button><div id="log"></div></details></div>
 <audio id="aud" autoplay playsinline></audio>
 
 <script>
@@ -109,6 +109,7 @@ class Sip{
       log('← '+e.data.slice(0,300));
       if(m.janus==='error'){this.ui.state('bad',m.error?.reason||'Janus error');return}
       if(m.transaction&&this.tx[m.transaction]&&m.janus!=='ack'&&m.janus!=='event'){const cb=this.tx[m.transaction];delete this.tx[m.transaction];cb(m);return}
+      if(m.janus==='trickle'){this.onTrickle(m.candidate);return}
       if(m.janus==='event')this.onEvent(m);
     };
     this.ws.onerror=()=>{log('ws error');this.ui.state('bad','Connection failed')};
@@ -124,10 +125,21 @@ class Sip{
     else if(ev==='registration_failed')this.ui.state('bad','Login failed: '+(r.reason||r.code||''));
     else if(ev==='calling')this.ui.call('Calling…');
     else if(ev==='ringing')this.ui.call('Ringing…');
-    else if(ev==='progress'){if(m.jsep&&this.pc)this.pc.setRemoteDescription(m.jsep).catch(x=>log(x));this.ui.call('Early media…')}
-    else if(ev==='accepted'){if(m.jsep&&this.pc&&this.pc.signalingState==='have-local-offer')this.pc.setRemoteDescription(m.jsep).catch(x=>log(x));this.ui.call('In call ✔',true)}
+    else if(ev==='progress'){if(m.jsep&&this.pc)this.setRemote(m.jsep).catch(x=>log('remote err '+x));this.ui.call('Early media…')}
+    else if(ev==='accepted'){if(m.jsep&&this.pc&&this.pc.signalingState==='have-local-offer')this.setRemote(m.jsep).catch(x=>log('remote err '+x));this.ui.call('In call ✔',true)}
     else if(ev==='hangup'){this.ui.state('ok','Ready');this.ui.idle('Call ended'+(r.reason?': '+r.reason:''));this.cleanup()}
     else if(ev==='incomingcall'){this.inJsep=m.jsep;this.ui.incoming(r.displayname||r.username||'Unknown')}
+  }
+  onTrickle(c){
+    if(!c||c.completed||!c.candidate)return;
+    if(this.pc&&this.pc.remoteDescription)this.pc.addIceCandidate(c).catch(x=>log('cand err '+x));
+    else(this.pend=this.pend||[]).push(c);
+  }
+  async setRemote(jsep){
+    await this.pc.setRemoteDescription(jsep);
+    const q=this.pend||[];this.pend=[];
+    for(const c of q)await this.pc.addIceCandidate(c).catch(x=>log('cand err '+x));
+    log('remote set, '+q.length+' queued cands added');
   }
   mkpc(){
     const a=this.a;
@@ -139,6 +151,17 @@ class Sip{
       const au=$('#aud');au.srcObject=e.streams[0]||new MediaStream([e.track]);
       au.play().catch(x=>log('play: '+x));
     };
+    clearInterval(this.st);
+    this.st=setInterval(async()=>{
+      if(!this.pc)return;
+      const r=await this.pc.getStats();const o=[];
+      r.forEach(x=>{
+        if(x.type==='inbound-rtp'&&x.kind==='audio')o.push('IN '+x.bytesReceived+'B');
+        if(x.type==='outbound-rtp'&&x.kind==='audio')o.push('OUT '+x.bytesSent+'B');
+        if(x.type==='candidate-pair'&&x.nominated&&x.state==='succeeded')o.push('pair ok');
+      });
+      log('stats: '+(o.join(' | ')||'no working pair'));
+    },3000);
     pc.onicecandidate=e=>{if(e.candidate)log('cand '+e.candidate.type+' '+(e.candidate.address||''))};
     pc.oniceconnectionstatechange=()=>{
       log('ICE '+pc.iceConnectionState);
@@ -166,7 +189,7 @@ class Sip{
   async answer(){
     try{
       const pc=this.mkpc();await this.mic(pc);
-      await pc.setRemoteDescription(this.inJsep);
+      await this.setRemote(this.inJsep);
       const an=await pc.createAnswer();await pc.setLocalDescription(an);await this.gather(pc);
       this.send({janus:'message',body:{request:'accept'},jsep:{type:'answer',sdp:pc.localDescription.sdp}});
     }catch(e){this.ui.idle('Answer error: '+e.message);this.cleanup()}
@@ -178,6 +201,7 @@ class Sip{
   cleanup(){
     try{this.stream?.getTracks().forEach(t=>t.stop())}catch(e){}
     try{this.pc?.close()}catch(e){}
+    clearInterval(this.st);this.pend=[];
     this.pc=null;this.stream=null;this.muted=false;this.inJsep=null;
     $('#mute').textContent='Mute';
   }
@@ -234,6 +258,9 @@ $('#hang').onclick=()=>cl&&cl.hangup();
 $('#mute').onclick=()=>{if(cl)$('#mute').textContent=cl.toggleMute()?'Unmute':'Mute'};
 $('#ans').onclick=()=>cl&&cl.answer();
 $('#dec').onclick=()=>{cl&&cl.decline();$('#incoming').style.display='none'};
+$('#cp').onclick=async()=>{const t=$('#log').textContent.replace(/\n\s+/g,' ');
+  try{await navigator.clipboard.writeText(t);$('#cp').textContent='Copied ✔'}catch(e){$('#cp').textContent='Copy failed'}
+  setTimeout(()=>$('#cp').textContent='Copy log',1500)};
 tabs();renderSet();
 </script>
 </body>

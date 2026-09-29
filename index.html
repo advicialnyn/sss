@@ -114,7 +114,8 @@ class Sip{
     this.ws.onclose=()=>{clearInterval(this.ka);if(!this.closing)this.ui.state('bad','Disconnected');this.cleanup()};
   }
   onEvent(m){
-    const r=m.plugin_data?.data?.result,err=m.plugin_data?.data?.error;
+    const pd=m.plugindata||m.plugin_data;
+    const r=pd?.data?.result,err=pd?.data?.error;
     if(err){this.ui.state('bad',err);return}
     if(!r)return;
     const ev=r.event;

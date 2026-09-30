@@ -43,7 +43,7 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
 </head>
 <body>
 <header>
-  <h1>📞 Dialer <small style="color:#8b91a1;font-size:11px">v8</small></h1>
+  <h1>📞 Dialer <small style="color:#8b91a1;font-size:11px">v9</small></h1>
   <div><button id="add" title="Add account">+</button>
     <div id="addmenu" hidden><button data-t="amarip">Amarip</button><button data-t="webvoice">Webvoice</button></div></div>
 </header>
@@ -64,12 +64,13 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
 
 <div class="card"><details id="setbox"><summary>⚙ Account settings</summary><div id="set"></div></details></div>
 <div class="card"><details><summary>🎙 Call recording → Telegram</summary>
-  <label><input type="checkbox" id="rec"> Record calls</label>
+  <button id="rectog" class="f" style="margin-top:8px;font-size:16px;padding:12px"></button>
   <label>Bot token</label><input class="f" id="tgt" type="password" autocomplete="off">
   <label>Channel ID (like -100123…, bot must be channel admin)</label><input class="f" id="tgc" autocomplete="off">
   <div class="row2"><button id="tgtest">Test Telegram</button><div id="tgres" style="font-size:13px;align-self:center"></div></div>
   <div style="font-size:12px;color:var(--mut);margin-top:8px">Saved only in this browser. If upload fails you get a Save link.</div>
-</details><div id="recs"></div></div>
+</details></div>
+<div class="card" id="recsCard" hidden><b>Recordings (this session)</b><div id="recs"></div></div>
 <div class="card"><details><summary>Log</summary><button id="cp" style="margin:8px 0;padding:8px 12px;border:0;border-radius:8px;background:#374151;color:#fff">Copy log</button><div id="log"></div></details></div>
 <div id="toast" hidden></div>
 <audio id="aud" autoplay playsinline></audio>
@@ -82,9 +83,9 @@ const mk=(t,n)=>({name:n,ws:TYPES[t].ws,host:'127.0.0.1:5060',user:'',auth:'',se
 const DEF=()=>[mk('amarip','Amarip 1'),mk('amarip','Amarip 2'),mk('webvoice','Webvoice 1'),mk('webvoice','Webvoice 2')];
 const ld=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))||d}catch(e){return d}};
 let accts=ld('dialer4',null);if(!Array.isArray(accts)||!accts.length)accts=DEF();
-const cfg=ld('dialer4cfg',{rec:false,tgToken:'',tgChat:''});
+const old=ld('dialer4cfg',{});const cfg=ld('dialer4cfg2',{rec:true,tgToken:old.tgToken||'',tgChat:old.tgChat||''});
 const save=()=>{try{localStorage.setItem('dialer4',JSON.stringify(accts))}catch(e){}};
-const saveCfg=()=>{try{localStorage.setItem('dialer4cfg',JSON.stringify(cfg))}catch(e){}};
+const saveCfg=()=>{try{localStorage.setItem('dialer4cfg2',JSON.stringify(cfg))}catch(e){}};
 function log(t){const l=$('#log');l.textContent=(l.textContent+new Date().toLocaleTimeString()+' '+t+'\n').slice(-9000);l.scrollTop=l.scrollHeight}
 function toast(t){const d=$('#toast');d.textContent=t;d.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>d.hidden=true,4000)}
 const fmtNum=(a,n)=>{const f=a.fmt||'local';return f==='noplus'?n.replace(/^\+/,''):f==='local'?n.replace(/^\+?880/,'0'):n};
@@ -122,16 +123,16 @@ $('#spk').onclick=async()=>{
 async function saveRec(blob,m){
   const ext=blob.type.includes('ogg')?'ogg':blob.type.includes('mp4')?'m4a':'webm',t=new Date(m.t0),p=n=>String(n).padStart(2,'0');
   const name=`${m.acc.replace(/\W+/g,'')}_${m.peer.replace(/[^\d+]/g,'')}_${t.getFullYear()}${p(t.getMonth()+1)}${p(t.getDate())}-${p(t.getHours())}${p(t.getMinutes())}${p(t.getSeconds())}.${ext}`;
-  const row=document.createElement('div');row.textContent='⏳ '+name;$('#recs').prepend(row);
-  const url=URL.createObjectURL(blob);
-  const fail=e=>{row.innerHTML=`❌ ${esc(name)} (${esc(e)}) <a href="${url}" download="${esc(name)}" style="color:var(--ac)">Save</a>`};
-  if(!cfg.tgToken||!cfg.tgChat)return fail('Telegram not set');
+  const row=document.createElement('div');row.textContent='⏳ '+name;$('#recs').prepend(row);$('#recsCard').hidden=false;
+  const url=URL.createObjectURL(blob),link=`<a href="${url}" download="${esc(name)}" style="color:var(--ac)">⬇ Download</a>`;
+  const done=(ic,note)=>{row.innerHTML=`${ic} ${esc(name)} ${note?'('+esc(note)+') ':''}${link}`};
+  if(!cfg.tgToken||!cfg.tgChat)return done('💾','Telegram not set');
   try{const fd=new FormData();fd.append('chat_id',cfg.tgChat);
     fd.append('caption',`${m.dir==='in'?'📥 Incoming from':'📤 Outgoing to'} ${m.peer}\n👤 ${m.acc}\n🕒 ${t.toLocaleString()}\n⏱ ${m.dur}s`);
     fd.append('document',blob,name);
     const r=await fetch(`https://api.telegram.org/bot${cfg.tgToken}/sendDocument`,{method:'POST',body:fd}),j=await r.json();
-    if(!j.ok)return fail(j.description);row.textContent='✅ '+name;
-  }catch(e){fail(e.message)}
+    if(!j.ok)return done('❌',j.description);done('✅','sent to Telegram')
+  }catch(e){done('❌',e.message)}
 }
 
 /* Janus SIP client (one per account, all stay registered) */
@@ -223,7 +224,7 @@ class Sip{
     if(!this.wa){const rs=$('#aud').srcObject;if(rs)try{this.wa=await loopback(rs)}catch(e){log('loopback err '+e)}}
     return this.wa}
   async startRec(){
-    if(!cfg.rec){log('recording: off (tick "Record calls")');return}
+    if(!cfg.rec){log('recording: off');toast('Recording is OFF');return}
     if(!window.MediaRecorder||!this.stream){log('recording: not supported');return}
     if(!cfg.tgToken||!cfg.tgChat)toast('Recording is on but Telegram is not set – you will get a Save link');
     try{const c=ctx();if(c.state==='suspended')await c.resume();
@@ -294,8 +295,8 @@ document.querySelectorAll('#addmenu button').forEach(b=>b.onclick=()=>{
 $('#cp').onclick=async()=>{try{await navigator.clipboard.writeText($('#log').textContent);$('#cp').textContent='Copied ✔'}catch(e){$('#cp').textContent='Copy failed'}setTimeout(()=>$('#cp').textContent='Copy log',1500)};
 
 /* recording settings */
-$('#rec').checked=!!cfg.rec;$('#tgt').value=cfg.tgToken||'';$('#tgc').value=cfg.tgChat||'';
-$('#rec').onchange=()=>{cfg.rec=$('#rec').checked;saveCfg()};
+const recBtn=()=>{$('#rectog').textContent=cfg.rec?'🔴 Recording: ON (tap to turn off)':'⚪ Recording: OFF (tap to turn on)'};recBtn();$('#tgt').value=cfg.tgToken||'';$('#tgc').value=cfg.tgChat||'';
+$('#rectog').onclick=()=>{cfg.rec=!cfg.rec;saveCfg();recBtn()};
 $('#tgt').oninput=()=>{cfg.tgToken=$('#tgt').value.trim();saveCfg()};
 $('#tgc').oninput=()=>{cfg.tgChat=$('#tgc').value.trim();saveCfg()};
 

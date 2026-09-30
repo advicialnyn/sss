@@ -43,7 +43,7 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
 </head>
 <body>
 <header>
-  <h1>📞 Dialer <small style="color:#8b91a1;font-size:11px">v12</small></h1>
+  <h1>📞 Dialer <small style="color:#8b91a1;font-size:11px">v14</small></h1>
   <div><button id="add" title="Add account">+</button>
     <div id="addmenu" hidden><button data-t="amarip">Amarip</button><button data-t="webvoice">Webvoice</button></div></div>
 </header>
@@ -65,6 +65,7 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
 <div class="card"><details id="setbox"><summary>⚙ Account settings</summary><div id="set"></div></details></div>
 <div class="card"><details><summary>🎙 Call recording → Telegram</summary>
   <button id="rectog" class="f" style="margin-top:8px;font-size:16px;padding:12px"></button>
+  <button id="tgtog" class="f" style="margin-top:8px;font-size:16px;padding:12px"></button>
   <label>Bot token</label><input class="f" id="tgt" type="password" autocomplete="off">
   <label>Channel ID (like -100123…, bot must be channel admin)</label><input class="f" id="tgc" autocomplete="off">
   <div class="row2"><button id="tgtest">Test Telegram</button><div id="tgres" style="font-size:13px;align-self:center"></div></div>
@@ -126,6 +127,7 @@ async function saveRec(blob,m){
   const row=document.createElement('div');row.textContent='⏳ '+name;$('#recs').prepend(row);$('#recsCard').hidden=false;
   const url=URL.createObjectURL(blob),link=`<a href="${url}" download="${esc(name)}" style="color:var(--ac)">⬇ Download</a>`;
   const done=(ic,note)=>{row.innerHTML=`${ic} ${esc(name)} ${note?'('+esc(note)+') ':''}${link}`};
+  if(cfg.tg===false)return done('💾','Telegram sending is off');
   if(!cfg.tgToken||!cfg.tgChat)return done('💾','Telegram not set');
   try{const fd=new FormData();fd.append('chat_id',cfg.tgChat);
     fd.append('caption',`${m.dir==='in'?'📥 Incoming from':'📤 Outgoing to'} ${m.peer}\n👤 ${m.acc}\n🕒 ${t.toLocaleString()}\n⏱ ${m.dur}s`);
@@ -251,13 +253,14 @@ async function getBalance(i){
   log(a.name+' login keys: '+Object.keys(j).join(',')+' | inner: '+Object.keys(j.user||j.data||{}).join(','));
   const find=(o,d=0)=>{if(!o||typeof o!=='object'||d>4)return;for(const k in o){if(/balance|credit/i.test(k)&&o[k]!==null&&typeof o[k]!=='object')return o[k];const x=find(o[k],d+1);if(x!==undefined)return x}};
   let b=find(j);const tok=j.token||j.access_token||j.jwt||j.data?.token;
-  log(a.name+' role: '+(j.user?.role||'?'));
+  if(b===undefined&&tok&&a.balPath){try{const rr=await fetch(base+a.balPath,{headers:{Authorization:'Bearer '+tok}});if(rr.ok)b=find(await rr.json())}catch(e){}}
+  if(b===undefined)log(a.name+' role: '+(j.user?.role||'?'));
   if(b===undefined&&tok){
     const paths=['/api/dashboard','/api/dashboard/stats','/api/dashboard/summary','/api/profile','/api/me','/api/balance','/api/account','/api/clients','/api/sip-users','/api/sip_users','/api/recharge','/api/recharges','/api/recharge/history','/api/stats','/api/reports/summary'];
     const res=await Promise.all(paths.map(async path=>{try{const rr=await fetch(base+path,{headers:{Authorization:'Bearer '+tok}});let jj=null;if(rr.ok)try{jj=await rr.json()}catch(e){}return{path,st:rr.status,jj}}catch(e){return{path,st:'err'}}}));
     for(const x of res){let d=String(x.st);
       if(x.jj){const arr=Array.isArray(x.jj),o=arr?x.jj[0]:x.jj;d+=(arr?' array['+x.jj.length+']':'')+' keys: '+Object.keys(o||{}).join(',');
-        if(b===undefined){const f=find(x.jj);if(f!==undefined){b=f;d+='  ← BALANCE FOUND: '+f}}}
+        if(b===undefined){const f=find(x.jj);if(f!==undefined){b=f;a.balPath=x.path;d+='  ← BALANCE FOUND: '+f}}}
       log(a.name+' '+x.path+' → '+d)}}
   if(b===undefined)throw new Error('no balance field found – copy the log to me');
   a.bal=b;a.balAt=Date.now();save();tabs();return b}
@@ -320,6 +323,8 @@ $('#cp').onclick=async()=>{try{await navigator.clipboard.writeText($('#log').tex
 
 /* recording settings */
 const recBtn=()=>{$('#rectog').textContent=cfg.rec?'🔴 Recording: ON (tap to turn off)':'⚪ Recording: OFF (tap to turn on)'};recBtn();$('#tgt').value=cfg.tgToken||'';$('#tgc').value=cfg.tgChat||'';
+const tgBtn=()=>{$('#tgtog').textContent=cfg.tg!==false?'✈ Send to Telegram: ON (tap to turn off)':'✈ Send to Telegram: OFF (tap to turn on)'};tgBtn();
+$('#tgtog').onclick=()=>{cfg.tg=cfg.tg===false;saveCfg();tgBtn()};
 $('#rectog').onclick=()=>{cfg.rec=!cfg.rec;saveCfg();recBtn()};
 $('#tgt').oninput=()=>{cfg.tgToken=$('#tgt').value.trim();saveCfg()};
 $('#tgc').oninput=()=>{cfg.tgChat=$('#tgc').value.trim();saveCfg()};
@@ -332,6 +337,8 @@ $('#tgtest').onclick=async()=>{const o=$('#tgres');o.textContent='Testing…';co
 
 /* start: register every account */
 clients=accts.map((a,i)=>new Sip(i));tabs();renderSet();clients.forEach(c=>c.connect());
+const autoBal=()=>accts.forEach((a,i)=>{if(a.user&&a.secret)setTimeout(()=>refreshBal(i,false),i*600)});
+autoBal();setInterval(autoBal,5*60*1000);
 </script>
 </body>
 </html>

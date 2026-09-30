@@ -36,23 +36,24 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
 .f{width:100%;background:#0f1115;border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:8px;font-size:14px}
 #log{font:11px ui-monospace,monospace;color:var(--mut);max-height:140px;overflow:auto;white-space:pre-wrap}
 #incoming{border-color:var(--ac);text-align:center}
-#inwho{font-size:20px;font-weight:600}
+.inwho{font-size:20px;font-weight:600}
 #toast{position:fixed;left:12px;right:12px;bottom:14px;background:#111;border:1px solid var(--line);padding:10px;border-radius:10px;text-align:center;font-size:14px}
+#pbmsg{min-height:18px}
+.pbrow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;padding:8px 10px;background:#20242e;border-radius:10px}
+.pbrow span{flex:1;cursor:pointer}.pbrow button{background:#374151;border:0;color:#fff;border-radius:8px;padding:6px 10px}
 #recs div{font-size:12px;margin-top:6px;word-break:break-all}
 </style>
 </head>
 <body>
 <header>
-  <h1>📞 Dialer <small style="color:#8b91a1;font-size:11px">v14</small></h1>
+  <h1>📞 Dialer <small style="color:#8b91a1;font-size:11px">v16</small></h1>
   <div><button id="add" title="Add account">+</button>
     <div id="addmenu" hidden><button data-t="amarip">Amarip</button><button data-t="webvoice">Webvoice</button></div></div>
 </header>
 <div class="tabs" id="tabs"></div>
 
-<div class="card" id="incoming" hidden>
-  <div id="inwho"></div><div id="inacc" style="color:var(--mut);font-size:13px"></div>
-  <div class="row2"><button id="ans" style="background:#16a34a">Answer</button><button id="dec" style="background:#dc2626">Decline</button></div>
-</div>
+<div class="card" id="incoming" hidden><div id="ringlist"></div></div>
+<div class="card" id="missedCard" hidden><div style="display:flex;justify-content:space-between;align-items:center"><b>Missed calls</b><button id="clrmiss" style="background:#374151;border:0;color:#fff;border-radius:8px;padding:6px 10px">Clear</button></div><div id="missed"></div></div>
 
 <div class="card">
   <input id="num" inputmode="tel" placeholder="Number" autocomplete="off">
@@ -62,6 +63,23 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
   <div class="row2"><button id="call">Call</button><button id="hang" disabled>Hang up</button></div>
 </div>
 
+<div class="card"><details id="pbbox"><summary>📒 Phonebook (passcode protected)</summary>
+  <div id="pblock"><label>Passcode (6+ characters – don't forget it, it can't be recovered)</label>
+    <input class="f" id="pbpass" type="password" autocomplete="off">
+    <div class="row2" style="grid-template-columns:1fr"><button id="pbgo">🔓 Unlock / create</button></div></div>
+  <div id="pbopen" hidden>
+    <input class="f" id="pbq" placeholder="Search name or number" style="margin-top:8px">
+    <div id="pblist"></div>
+    <div class="row2"><button id="pbadd">＋ Save typed number</button><button id="pblockbtn">🔒 Lock</button></div></div>
+  <div id="pbmsg"></div>
+  <details style="margin-top:8px"><summary>GitHub sync</summary>
+    <label>Repo (owner/name)</label><input class="f" id="ghrepo" autocomplete="off" placeholder="advicialnyn/my-repo">
+    <label>Branch</label><input class="f" id="ghbranch" autocomplete="off">
+    <label>File path</label><input class="f" id="ghpath" autocomplete="off">
+    <label>Access token (fine-grained, this repo only, Contents: read &amp; write)</label><input class="f" id="ghtok" type="password" autocomplete="off">
+    <div style="font-size:12px;color:var(--mut);margin-top:8px">Numbers are encrypted in your browser before upload. Use a private repo and a long passcode. Token is saved only in this browser.</div>
+  </details>
+</details></div>
 <div class="card"><details id="setbox"><summary>⚙ Account settings</summary><div id="set"></div></details></div>
 <div class="card"><details><summary>🎙 Call recording → Telegram</summary>
   <button id="rectog" class="f" style="margin-top:8px;font-size:16px;padding:12px"></button>
@@ -98,8 +116,8 @@ let wl;const keepAwake=async()=>{try{wl=await navigator.wakeLock.request('screen
 document.addEventListener('pointerdown',()=>{try{ctx().resume()}catch(e){}
   if('Notification' in window&&Notification.permission==='default')Notification.requestPermission();keepAwake()},{once:true});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)keepAwake()});
-let ringT;
-function ring(on){clearInterval(ringT);navigator.vibrate&&navigator.vibrate(0);if(!on)return;
+let ringT,ringOn=false;
+function ring(on){clearInterval(ringT);ringOn=on;navigator.vibrate&&navigator.vibrate(0);if(!on)return;
   const beep=()=>{try{const c=ctx(),o=c.createOscillator(),g=c.createGain();o.frequency.value=440;g.gain.value=.15;o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+.5)}catch(e){}
     navigator.vibrate&&navigator.vibrate([400,200,400])};
   beep();ringT=setInterval(beep,2000)}
@@ -112,13 +130,13 @@ async function loopback(stream){ /* Chrome can't feed remote WebRTC audio to Web
   const an=await b.createAnswer();await b.setLocalDescription(an);await a.setRemoteDescription(an);
   const st=await out;st._pcs=[a,b];return st}
 let boost=null;
-function speakerOff(){if(boost){try{boost.s.disconnect();boost.g.disconnect();boost.k.disconnect()}catch(e){}boost=null}$('#aud').muted=false;$('#spk').classList.remove('on')}
+function speakerOff(){if(boost){try{boost.s.disconnect();boost.g.disconnect();boost.k.disconnect()}catch(e){}if(boost.au)boost.au.muted=false;boost=null}$('#spk').classList.remove('on')}
 $('#spk').onclick=async()=>{
   if(boost)return speakerOff();
   if(!busy||!busy.live)return toast('Loud works during a call');
   const rs=await busy.rsWA();if(!rs)return toast('Loud not available');
   const c=ctx();await c.resume();const s=c.createMediaStreamSource(rs),g=c.createGain(),k=c.createDynamicsCompressor();
-  g.gain.value=2.5;s.connect(g);g.connect(k);k.connect(c.destination);$('#aud').muted=true;boost={s,g,k};$('#spk').classList.add('on')};
+  g.gain.value=2.5;s.connect(g);g.connect(k);k.connect(c.destination);busy.au.muted=true;boost={s,g,k,au:busy.au};$('#spk').classList.add('on')};
 
 /* recording */
 async function saveRec(blob,m){
@@ -140,7 +158,7 @@ async function saveRec(blob,m){
 /* Janus SIP client (one per account, all stay registered) */
 let accts_,clients=[],cur=0,busy=null;
 class Sip{
-  constructor(i){this.i=i;this.a=accts[i];this.tx={};this.status='wait';this.msg='';this.pend=[]}
+  constructor(i){this.i=i;this.a=accts[i];this.tx={};this.status='wait';this.msg='';this.pend=[];this.au=document.createElement('audio');this.au.autoplay=true;this.au.playsInline=true}
   st(k,t){this.status=k;this.msg=t;tabs();if(cur===this.i&&!busy)$('#st').textContent=t}
   send(o,cb){o.transaction=Math.random().toString(36).slice(2,12);if(cb)this.tx[o.transaction]=cb;
     if(this.sid)o.session_id=this.sid;if(this.hid&&o.janus==='message')o.handle_id=this.hid;
@@ -165,7 +183,7 @@ class Sip{
       if(m.janus==='event')this.onEvent(m);
     };
     this.ws.onerror=()=>log(a.name+' ws error');
-    this.ws.onclose=()=>{clearInterval(this.ka);if(busy===this)this.finish('Disconnected');
+    this.ws.onclose=()=>{clearInterval(this.ka);if(busy===this||this.ringing||this.live)this.finish('Disconnected');
       if(!this.closing){this.st('bad','Disconnected – retrying…');setTimeout(()=>{if(!this.closing)this.connect()},5000)}};
   }
   close(){this.closing=true;clearInterval(this.ka);try{this.ws.close()}catch(e){}}
@@ -184,10 +202,10 @@ class Sip{
   }
   onIncoming(r,jsep){
     const who=(/sip:([^@;>]+)/.exec(r.username||'')||[])[1]||r.displayname||'Unknown';
-    if(busy){this.send({janus:'message',body:{request:'decline'}});toast('Missed (busy): '+who+' → '+this.a.name);log('busy, declined '+who);return}
-    busy=this;this.dir='in';this.peer=who;this.inJsep=jsep;this.live=false;
-    cur=this.i;tabs();renderSet();setBtns();
-    $('#inwho').textContent=who+' is calling…';$('#inacc').textContent='on '+this.a.name;$('#incoming').hidden=false;ring(true);
+    if(busy===this||this.ringing||this.live){this.send({janus:'message',body:{request:'decline'}});log('same account busy, declined '+who);return}
+    this.dir='in';this.peer=who;this.inJsep=jsep;this.live=false;this.ringing=true;ringers.push(this);
+    if(!busy){cur=this.i;tabs();renderSet()}
+    renderRing();
     if(document.hidden&&window.Notification&&Notification.permission==='granted')try{new Notification('Incoming call',{body:who+' → '+this.a.name})}catch(e){}
   }
   onTrickle(c){if(!c||c.completed||!c.candidate)return;
@@ -197,7 +215,7 @@ class Sip{
   mkpc(){
     const a=this.a,urls=(a.ice||'').split(',').map(x=>x.trim()).filter(Boolean);
     const pc=new RTCPeerConnection({iceServers:urls.length?[Object.assign({urls},a.iceUser?{username:a.iceUser,credential:a.icePass}:{})]:[]});
-    pc.ontrack=e=>{const au=$('#aud');au.srcObject=e.streams[0]||new MediaStream([e.track]);au.play().catch(x=>log('play: '+x))};
+    pc.ontrack=e=>{const au=this.au;au.srcObject=e.streams[0]||new MediaStream([e.track]);au.play().catch(x=>log('play: '+x))};
     pc.oniceconnectionstatechange=()=>{log('ICE '+pc.iceConnectionState);if(pc.iceConnectionState==='failed')$('#st').textContent='⚠ Audio link failed'};
     this.pc=pc;return pc}
   gather(pc){return new Promise(res=>{if(pc.iceGatheringState==='complete')return res();
@@ -209,21 +227,21 @@ class Sip{
       this.send({janus:'message',body:{request:'call',uri:`sip:${num}@${this.a.host}`},jsep:{type:'offer',sdp:pc.localDescription.sdp}});
     }catch(e){this.finish('Mic/call error: '+e.message)}}
   async answer(){
-    $('#incoming').hidden=true;ring(false);$('#st').textContent='Connecting…';
+    busy=this;cur=this.i;this.ringing=false;tabs();renderSet();setBtns();$('#st').textContent='Connecting…';
     try{const pc=this.mkpc();await this.mic(pc);await this.setRemote(this.inJsep);const an=await pc.createAnswer();await pc.setLocalDescription(an);await this.gather(pc);
       this.send({janus:'message',body:{request:'accept'},jsep:{type:'answer',sdp:pc.localDescription.sdp}});
     }catch(e){this.finish('Answer error: '+e.message)}}
-  decline(){this.send({janus:'message',body:{request:'decline'}});$('#incoming').hidden=true;ring(false);busy=null;setBtns();$('#st').textContent=this.msg}
+  decline(){this.send({janus:'message',body:{request:'decline'}});this.ringing=false;ringers=ringers.filter(x=>x!==this);renderRing()}
   hangup(){this.send({janus:'message',body:{request:'hangup'}})}
   dtmf(d){this.send({janus:'message',body:{request:'dtmf_info',digit:d}})}
-  goLive(){if(this.live)return;this.live=true;this.t0=Date.now();ring(false);$('#incoming').hidden=true;this.startRec();
+  goLive(){if(this.live)return;this.live=true;this.t0=Date.now();this.startRec();
     this.tm=setInterval(()=>{if(!this.held)$('#st').textContent='In call '+clock(Date.now()-this.t0)+(this.rec?'  🔴 REC':'')},1000);$('#st').textContent='In call 00:00';setBtns()}
   toggleMute(){this.muted=!this.muted;this.applyMic();setBtns()}
-  toggleHold(){this.held=!this.held;this.send({janus:'message',body:{request:this.held?'hold':'unhold'}});this.applyMic();
-    $('#st').textContent=this.held?'⏸ On hold':'In call';setBtns()}
+  setHold(on){this.held=on;this.send({janus:'message',body:{request:on?'hold':'unhold'}});this.applyMic();this.au.muted=on}
+  toggleHold(){this.setHold(!this.held);$('#st').textContent=this.held?'⏸ On hold':'In call';setBtns()}
   applyMic(){this.stream?.getAudioTracks().forEach(t=>t.enabled=!this.muted&&!this.held)}
   async rsWA(){
-    if(!this.wa){const rs=$('#aud').srcObject;if(rs)try{this.wa=await loopback(rs)}catch(e){log('loopback err '+e)}}
+    if(!this.wa){const rs=this.au.srcObject;if(rs)try{this.wa=await loopback(rs)}catch(e){log('loopback err '+e)}}
     return this.wa}
   async startRec(){
     if(!cfg.rec){log('recording: off');toast('Recording is OFF');return}
@@ -239,10 +257,17 @@ class Sip{
   stopRec(){try{if(this.rec&&this.rec.state!=='inactive')this.rec.stop()}catch(e){}this.rec=null}
   cleanup(){try{this.stream?.getTracks().forEach(t=>t.stop())}catch(e){}try{this.pc?.close()}catch(e){}try{this.wa?._pcs.forEach(x=>x.close())}catch(e){}this.wa=null;this.pc=null;this.stream=null;this.pend=[]}
   finish(msg){
-    if(busy!==this){this.cleanup();return}
-    this.stopRec();clearInterval(this.tm);this.cleanup();
-    busy=null;this.live=this.held=this.muted=false;
-    ring(false);$('#incoming').hidden=true;speakerOff();$('#st').textContent=msg;setBtns();if(this.a.bal!==undefined)setTimeout(()=>refreshBal(this.i,false),3000)}
+    const was=busy===this;
+    heldCalls=heldCalls.filter(x=>x!==this);
+    if(this.ringing){this.ringing=false;ringers=ringers.filter(x=>x!==this);addMissed(this);renderRing()}
+    if(!was&&!this.live){this.cleanup();return}
+    this.stopRec();clearInterval(this.tm);this.cleanup();this.live=this.held=this.muted=false;
+    if(!was)return;
+    busy=null;speakerOff();$('#st').textContent=msg;
+    const h=heldCalls.pop();
+    if(h&&h.live){busy=h;cur=h.i;h.setHold(false);tabs();renderSet();$('#st').textContent='▶ Back to '+h.peer}
+    setBtns();
+    if(this.a.bal!==undefined)setTimeout(()=>refreshBal(this.i,false),3000)}
 }
 
 /* balance: log in to the panel API, look for a balance/credit field */
@@ -268,6 +293,27 @@ async function refreshBal(i,verbose){
   const o=$('#balres');if(verbose&&o)o.textContent='Checking…';
   try{const b=await getBalance(i);if(verbose&&o)o.textContent='💰 Balance: '+b}
   catch(e){const m=e instanceof TypeError?'Blocked by the site (CORS) – needs a proxy':e.message;log('balance: '+m);if(verbose&&o)o.textContent='❌ '+m}}
+
+/* incoming / waiting / missed calls */
+let ringers=[],heldCalls=[],missed=ld('dialer4missed',[]);
+function takeCall(c){
+  ringers=ringers.filter(x=>x!==c);
+  if(busy&&busy!==c){if(busy.live){busy.setHold(true);heldCalls.push(busy)}else busy.hangup()}
+  renderRing();c.answer()}
+function renderRing(){
+  const box=$('#incoming');
+  if(!ringers.length){box.hidden=true;ring(false);return}
+  box.hidden=false;
+  $('#ringlist').innerHTML=ringers.map((c,k)=>`<div style="margin-bottom:12px"><div class="inwho">${esc(c.peer)} is calling…</div><div style="color:var(--mut);font-size:13px">on ${esc(c.a.name)}${busy?' · answering puts your current call on hold':''}</div><div class="row2"><button data-a="${k}" style="background:#16a34a">Answer</button><button data-d="${k}" style="background:#dc2626">Decline</button></div></div>`).join('');
+  $('#ringlist').querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>takeCall(ringers[+b.dataset.a]));
+  $('#ringlist').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>ringers[+b.dataset.d].decline());
+  if(!ringOn)ring(true)}
+function renderMissed(){
+  $('#missedCard').hidden=!missed.length;
+  $('#missed').innerHTML=missed.map((m,k)=>`<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px"><span>${esc(m.who)} <small style="color:var(--mut)">${esc(m.acc)} · ${new Date(m.t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</small></span><button data-m="${k}" style="background:#374151;border:0;color:#fff;border-radius:8px;padding:6px 10px">Call back</button></div>`).join('');
+  document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{$('#num').value=missed[+b.dataset.m].who;window.scrollTo(0,0)})}
+function addMissed(c){missed.unshift({who:c.peer,acc:c.a.name,t:Date.now()});missed=missed.slice(0,20);try{localStorage.setItem('dialer4missed',JSON.stringify(missed))}catch(e){}renderMissed()}
+$('#clrmiss').onclick=()=>{missed=[];try{localStorage.removeItem('dialer4missed')}catch(e){}renderMissed()};
 
 /* UI */
 function setBtns(){const b=busy,l=!!(b&&b.live);
@@ -312,8 +358,6 @@ $('#call').onclick=()=>{const c=clients[cur];if(!c||c.status!=='ok')return toast
 $('#hang').onclick=()=>busy&&busy.hangup();
 $('#mute').onclick=()=>busy&&busy.toggleMute();
 $('#hold').onclick=()=>busy&&busy.toggleHold();
-$('#ans').onclick=()=>busy&&busy.answer();
-$('#dec').onclick=()=>busy&&busy.decline();
 $('#add').onclick=()=>$('#addmenu').hidden=!$('#addmenu').hidden;
 document.querySelectorAll('#addmenu button').forEach(b=>b.onclick=()=>{
   const t=b.dataset.t,n=accts.filter(a=>a.name.toLowerCase().startsWith(t)).length+1;
@@ -335,8 +379,68 @@ $('#tgtest').onclick=async()=>{const o=$('#tgres');o.textContent='Testing…';co
     o.textContent=m.ok?'✅ @'+r.result.username+' works – check the channel':'❌ Channel: '+m.description+' (token is valid)'}
   catch(e){o.textContent='❌ '+e.message}};
 
+/* ---------- encrypted phonebook (AES-GCM, key from passcode via PBKDF2), synced to a GitHub file ---------- */
+cfg.gh=Object.assign({repo:'',branch:'main',path:'phonebook.enc.json',token:''},cfg.gh||{});
+const b64=u=>btoa(String.fromCharCode(...new Uint8Array(u))),unb64=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0));
+let pbKey=null,pbSalt=null,pbList=[],pbSha=null,pbT;
+const pbMsg=t=>$('#pbmsg').textContent=t;
+async function deriveKey(pass,salt){const km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pass),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:200000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function encBook(){const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},pbKey,new TextEncoder().encode(JSON.stringify(pbList)));
+  return JSON.stringify({v:1,salt:b64(pbSalt),iv:b64(iv),data:b64(ct)})}
+async function decBook(text,pass){const o=JSON.parse(text),salt=unb64(o.salt),key=await deriveKey(pass,salt);
+  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(o.iv)},key,unb64(o.data));
+  pbSalt=salt;pbKey=key;pbList=JSON.parse(new TextDecoder().decode(pt))}
+const ghOn=()=>cfg.gh.repo&&cfg.gh.token;
+const ghUrl=()=>`https://api.github.com/repos/${cfg.gh.repo}/contents/${cfg.gh.path||'phonebook.enc.json'}`;
+const ghH=()=>({Authorization:'Bearer '+cfg.gh.token,Accept:'application/vnd.github+json'});
+async function ghGet(){if(!ghOn())return null;
+  const r=await fetch(ghUrl()+'?ref='+(cfg.gh.branch||'main')+'&t='+Date.now(),{headers:ghH(),cache:'no-store'});
+  if(r.status===404)return{missing:true};if(!r.ok)throw new Error('GitHub '+r.status);
+  const j=await r.json();pbSha=j.sha;return{text:atob(j.content.replace(/\n/g,''))}}
+async function ghPut(text){const body={message:'update phonebook',content:btoa(text),branch:cfg.gh.branch||'main'};if(pbSha)body.sha=pbSha;
+  const r=await fetch(ghUrl(),{method:'PUT',headers:Object.assign({'Content-Type':'application/json'},ghH()),body:JSON.stringify(body)});
+  if(!r.ok)throw new Error('GitHub '+r.status);pbSha=(await r.json()).content.sha}
+async function pbSave(){
+  const text=await encBook();try{localStorage.setItem('dialer4pb',text)}catch(e){}
+  if(!ghOn())return toast('Saved on this phone only (set GitHub sync to back up)');
+  try{await ghPut(text);toast('Saved to GitHub ✔')}
+  catch(e){if(/409|422/.test(e.message)){try{await ghGet();await ghPut(text);return toast('Saved to GitHub ✔')}catch(e2){e=e2}}
+    toast('Saved on phone only – '+e.message)}}
+async function pbUnlock(){
+  const pass=$('#pbpass').value;if(pass.length<6)return pbMsg('Passcode must be 6+ characters');
+  pbMsg('Unlocking…');let text=null,failed=false,missing=false;
+  try{const r=await ghGet();if(r&&r.text)text=r.text;if(r&&r.missing)missing=true}catch(e){failed=true;log('phonebook: '+e.message)}
+  if(!text)text=localStorage.getItem('dialer4pb');
+  if(!text&&failed)return pbMsg('❌ Could not reach GitHub (check internet, repo, token) and no copy on this phone');
+  try{
+    if(text){await decBook(text,pass);try{localStorage.setItem('dialer4pb',text)}catch(e){}}
+    else{if(!confirm('No phonebook found. Create a new one with this passcode? It cannot be recovered if you forget it.'))return pbMsg('');
+      pbSalt=crypto.getRandomValues(new Uint8Array(16));pbKey=await deriveKey(pass,pbSalt);pbList=[];await pbSave()}
+  }catch(e){pbKey=null;return pbMsg('❌ Wrong passcode (or damaged file)')}
+  $('#pbpass').value='';pbMsg('');pbShow();pbTouch()}
+function pbLock(){pbKey=null;pbSalt=null;pbList=[];clearTimeout(pbT);pbShow();pbMsg('🔒 Locked')}
+function pbTouch(){clearTimeout(pbT);if(pbKey)pbT=setTimeout(pbLock,5*60*1000)}
+function pbShow(){
+  const ok=!!pbKey;$('#pblock').hidden=ok;$('#pbopen').hidden=!ok;if(!ok){$('#pblist').innerHTML='';return}
+  const q=$('#pbq').value.toLowerCase();
+  const items=pbList.map((c,i)=>({c,i})).filter(({c})=>(c.name+' '+c.number).toLowerCase().includes(q)).sort((a,b)=>a.c.name.localeCompare(b.c.name));
+  $('#pblist').innerHTML=items.length?items.map(({c,i})=>`<div class="pbrow"><span data-pu="${i}"><b>${esc(c.name)}</b><br><small style="color:var(--mut)">${esc(c.number)}</small></span><button data-pd="${i}">✕</button></div>`).join(''):'<div style="color:var(--mut);margin-top:8px;font-size:13px">No numbers yet</div>';
+  $('#pblist').querySelectorAll('[data-pu]').forEach(el=>el.onclick=()=>{$('#num').value=pbList[+el.dataset.pu].number;pbTouch();window.scrollTo(0,0)});
+  $('#pblist').querySelectorAll('[data-pd]').forEach(el=>el.onclick=async()=>{const c=pbList[+el.dataset.pd];
+    if(!confirm('Delete '+c.name+'?'))return;pbList.splice(+el.dataset.pd,1);await pbSave();pbShow();pbTouch()})}
+$('#pbgo').onclick=pbUnlock;
+$('#pbpass').onkeydown=e=>{if(e.key==='Enter')pbUnlock()};
+$('#pblockbtn').onclick=pbLock;
+$('#pbq').oninput=pbShow;
+$('#pbadd').onclick=async()=>{const n=$('#num').value.trim().replace(/[^\d+*#]/g,'');if(!n)return toast('Type a number in the dialer first');
+  const name=prompt('Name for '+n+'?');if(!name)return;pbList.push({name:name.trim(),number:n});await pbSave();pbShow();pbTouch()};
+document.addEventListener('pointerdown',pbTouch);
+[['ghrepo','repo'],['ghbranch','branch'],['ghpath','path'],['ghtok','token']].forEach(([id,k])=>{$('#'+id).value=cfg.gh[k]||'';$('#'+id).oninput=()=>{cfg.gh[k]=$('#'+id).value.trim();saveCfg()}});
+
 /* start: register every account */
-clients=accts.map((a,i)=>new Sip(i));tabs();renderSet();clients.forEach(c=>c.connect());
+renderMissed();clients=accts.map((a,i)=>new Sip(i));tabs();renderSet();clients.forEach(c=>c.connect());
 const autoBal=()=>accts.forEach((a,i)=>{if(a.user&&a.secret)setTimeout(()=>refreshBal(i,false),i*600)});
 autoBal();setInterval(autoBal,5*60*1000);
 </script>

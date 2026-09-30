@@ -43,7 +43,7 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
 </head>
 <body>
 <header>
-  <h1>📞 Dialer <small style="color:#8b91a1;font-size:11px">v11</small></h1>
+  <h1>📞 Dialer <small style="color:#8b91a1;font-size:11px">v12</small></h1>
   <div><button id="add" title="Add account">+</button>
     <div id="addmenu" hidden><button data-t="amarip">Amarip</button><button data-t="webvoice">Webvoice</button></div></div>
 </header>
@@ -249,11 +249,16 @@ async function getBalance(i){
   const r=await fetch(base+'/api/login',{method:'POST',headers:H,body:JSON.stringify({username:a.pUser||a.user,password:a.pPass||a.secret})});
   const j=await r.json();
   log(a.name+' login keys: '+Object.keys(j).join(',')+' | inner: '+Object.keys(j.user||j.data||{}).join(','));
-  const find=(o,d=0)=>{if(!o||typeof o!=='object'||d>4)return;for(const k in o){if(/bal|credit|amount/i.test(k)&&o[k]!==null&&typeof o[k]!=='object')return o[k];const x=find(o[k],d+1);if(x!==undefined)return x}};
+  const find=(o,d=0)=>{if(!o||typeof o!=='object'||d>4)return;for(const k in o){if(/balance|credit/i.test(k)&&o[k]!==null&&typeof o[k]!=='object')return o[k];const x=find(o[k],d+1);if(x!==undefined)return x}};
   let b=find(j);const tok=j.token||j.access_token||j.jwt||j.data?.token;
-  if(b===undefined&&tok)for(const path of ['/api/whoami','/api/me','/api/profile','/api/user','/api/balance','/api/account']){
-    try{const rr=await fetch(base+path,{headers:{Authorization:'Bearer '+tok}});if(!rr.ok)continue;const jj=await rr.json();
-      log(a.name+' '+path+' keys: '+Object.keys(jj).join(','));b=find(jj);if(b!==undefined)break}catch(e){}}
+  log(a.name+' role: '+(j.user?.role||'?'));
+  if(b===undefined&&tok){
+    const paths=['/api/dashboard','/api/dashboard/stats','/api/dashboard/summary','/api/profile','/api/me','/api/balance','/api/account','/api/clients','/api/sip-users','/api/sip_users','/api/recharge','/api/recharges','/api/recharge/history','/api/stats','/api/reports/summary'];
+    const res=await Promise.all(paths.map(async path=>{try{const rr=await fetch(base+path,{headers:{Authorization:'Bearer '+tok}});let jj=null;if(rr.ok)try{jj=await rr.json()}catch(e){}return{path,st:rr.status,jj}}catch(e){return{path,st:'err'}}}));
+    for(const x of res){let d=String(x.st);
+      if(x.jj){const arr=Array.isArray(x.jj),o=arr?x.jj[0]:x.jj;d+=(arr?' array['+x.jj.length+']':'')+' keys: '+Object.keys(o||{}).join(',');
+        if(b===undefined){const f=find(x.jj);if(f!==undefined){b=f;d+='  ← BALANCE FOUND: '+f}}}
+      log(a.name+' '+x.path+' → '+d)}}
   if(b===undefined)throw new Error('no balance field found – copy the log to me');
   a.bal=b;a.balAt=Date.now();save();tabs();return b}
 async function refreshBal(i,verbose){

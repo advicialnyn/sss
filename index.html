@@ -43,7 +43,7 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
 </head>
 <body>
 <header>
-  <h1>📞 Dialer <small style="color:#8b91a1;font-size:11px">v9</small></h1>
+  <h1>📞 Dialer <small style="color:#8b91a1;font-size:11px">v11</small></h1>
   <div><button id="add" title="Add account">+</button>
     <div id="addmenu" hidden><button data-t="amarip">Amarip</button><button data-t="webvoice">Webvoice</button></div></div>
 </header>
@@ -240,8 +240,26 @@ class Sip{
     if(busy!==this){this.cleanup();return}
     this.stopRec();clearInterval(this.tm);this.cleanup();
     busy=null;this.live=this.held=this.muted=false;
-    ring(false);$('#incoming').hidden=true;speakerOff();$('#st').textContent=msg;setBtns()}
+    ring(false);$('#incoming').hidden=true;speakerOff();$('#st').textContent=msg;setBtns();if(this.a.bal!==undefined)setTimeout(()=>refreshBal(this.i,false),3000)}
 }
+
+/* balance: log in to the panel API, look for a balance/credit field */
+async function getBalance(i){
+  const a=accts[i],base='https://'+new URL(a.ws).host,H={'Content-Type':'application/json'};
+  const r=await fetch(base+'/api/login',{method:'POST',headers:H,body:JSON.stringify({username:a.pUser||a.user,password:a.pPass||a.secret})});
+  const j=await r.json();
+  log(a.name+' login keys: '+Object.keys(j).join(',')+' | inner: '+Object.keys(j.user||j.data||{}).join(','));
+  const find=(o,d=0)=>{if(!o||typeof o!=='object'||d>4)return;for(const k in o){if(/bal|credit|amount/i.test(k)&&o[k]!==null&&typeof o[k]!=='object')return o[k];const x=find(o[k],d+1);if(x!==undefined)return x}};
+  let b=find(j);const tok=j.token||j.access_token||j.jwt||j.data?.token;
+  if(b===undefined&&tok)for(const path of ['/api/whoami','/api/me','/api/profile','/api/user','/api/balance','/api/account']){
+    try{const rr=await fetch(base+path,{headers:{Authorization:'Bearer '+tok}});if(!rr.ok)continue;const jj=await rr.json();
+      log(a.name+' '+path+' keys: '+Object.keys(jj).join(','));b=find(jj);if(b!==undefined)break}catch(e){}}
+  if(b===undefined)throw new Error('no balance field found – copy the log to me');
+  a.bal=b;a.balAt=Date.now();save();tabs();return b}
+async function refreshBal(i,verbose){
+  const o=$('#balres');if(verbose&&o)o.textContent='Checking…';
+  try{const b=await getBalance(i);if(verbose&&o)o.textContent='💰 Balance: '+b}
+  catch(e){const m=e instanceof TypeError?'Blocked by the site (CORS) – needs a proxy':e.message;log('balance: '+m);if(verbose&&o)o.textContent='❌ '+m}}
 
 /* UI */
 function setBtns(){const b=busy,l=!!(b&&b.live);
@@ -249,7 +267,7 @@ function setBtns(){const b=busy,l=!!(b&&b.live);
   $('#mute').textContent=b&&b.muted?'Unmute':'Mute';$('#mute').classList.toggle('on',!!(b&&b.muted));
   $('#hold').textContent=b&&b.held?'Resume':'Hold';$('#hold').classList.toggle('on',!!(b&&b.held))}
 function tabs(){
-  $('#tabs').innerHTML=accts.map((a,i)=>`<button class="tab ${i===cur?'on':''}" data-i="${i}"><span class="dot ${clients[i]?clients[i].status:''}"></span>${esc(a.name)}<small>${esc(a.user||'not set')}</small></button>`).join('');
+  $('#tabs').innerHTML=accts.map((a,i)=>`<button class="tab ${i===cur?'on':''}" data-i="${i}"><span class="dot ${clients[i]?clients[i].status:''}"></span>${esc(a.name)}<small>${esc(a.user||'not set')}${a.bal!==undefined?' · 💰 '+esc(a.bal):''}</small></button>`).join('');
   document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>pick(+b.dataset.i))}
 function pick(i){if(busy)return toast('Finish the current call first');cur=i;tabs();renderSet();$('#st').textContent=clients[i]?clients[i].msg:''}
 function renderSet(){
@@ -257,11 +275,12 @@ function renderSet(){
   const f=(k,l,t='text')=>`<label>${l}</label><input class="f" type="${t}" data-k="${k}" value="${esc(a[k])}" autocomplete="off">`;
   $('#set').innerHTML=`<div style="margin-top:8px;color:var(--mut);font-size:12px">Editing: ${esc(a.name)}</div>`+
     f('name','Label')+f('user','SIP number / username')+f('auth','Auth user (blank = same as number)')+f('secret','SIP secret / password','password')+
-    f('ws','Janus WebSocket URL')+f('host','SIP host:port')+f('ice','STUN/TURN URL(s), comma separated')+f('iceUser','TURN username (optional)')+f('icePass','TURN password (optional)','password')+
+    f('ws','Janus WebSocket URL')+f('host','SIP host:port')+f('ice','STUN/TURN URL(s), comma separated')+f('iceUser','TURN username (optional)')+f('icePass','TURN password (optional)','password')+f('pUser','Panel login username (blank = SIP number)')+f('pPass','Panel login password (blank = SIP secret)','password')+
     `<label>Dial format</label><select class="f" data-k="fmt"><option value="local">+880… → 0… (local)</option><option value="noplus">Remove + only</option><option value="asis">As typed</option></select>
-     <div class="row2"><button id="recon">Save &amp; reconnect</button><button id="del" style="background:#7f1d1d">Delete account</button></div>`;
+     <div class="row2" style="grid-template-columns:1fr"><button id="balbtn">💰 Check balance</button></div><div id="balres" style="font-size:13px;margin-top:6px"></div><div class="row2"><button id="recon">Save &amp; reconnect</button><button id="del" style="background:#7f1d1d">Delete account</button></div>`;
   $('#set select').value=a.fmt||'local';
   document.querySelectorAll('#set [data-k]').forEach(inp=>inp.oninput=inp.onchange=()=>{a[inp.dataset.k]=inp.value;save();tabs()});
+  $('#balbtn').onclick=()=>refreshBal(cur,true);
   $('#recon').onclick=()=>{if(busy===clients[cur])return toast('Finish the call first');clients[cur].close();clients[cur]=new Sip(cur);clients[cur].connect()};
   $('#del').onclick=()=>{if(busy)return toast('Finish the call first');if(!confirm('Delete '+a.name+'?'))return;
     clients[cur].close();accts.splice(cur,1);clients.splice(cur,1);

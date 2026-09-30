@@ -43,7 +43,7 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
 </head>
 <body>
 <header>
-  <h1>📞 Dialer <small style="color:#8b91a1;font-size:11px">v6</small></h1>
+  <h1>📞 Dialer <small style="color:#8b91a1;font-size:11px">v7</small></h1>
   <div><button id="add" title="Add account">+</button>
     <div id="addmenu" hidden><button data-t="amarip">Amarip</button><button data-t="webvoice">Webvoice</button></div></div>
 </header>
@@ -100,10 +100,22 @@ function ring(on){clearInterval(ringT);navigator.vibrate&&navigator.vibrate(0);i
   const beep=()=>{try{const c=ctx(),o=c.createOscillator(),g=c.createGain();o.frequency.value=440;g.gain.value=.15;o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+.5)}catch(e){}
     navigator.vibrate&&navigator.vibrate([400,200,400])};
   beep();ringT=setInterval(beep,2000)}
+async function loopback(stream){ /* Chrome can't feed remote WebRTC audio to WebAudio directly; pipe it through a local loopback */
+  const a=new RTCPeerConnection(),b=new RTCPeerConnection();
+  a.onicecandidate=e=>e.candidate&&b.addIceCandidate(e.candidate).catch(()=>{});b.onicecandidate=e=>e.candidate&&a.addIceCandidate(e.candidate).catch(()=>{});
+  stream.getAudioTracks().forEach(t=>a.addTrack(t,stream));
+  const out=new Promise(r=>b.ontrack=e=>r(e.streams[0]||new MediaStream([e.track])));
+  const o=await a.createOffer();await a.setLocalDescription(o);await b.setRemoteDescription(o);
+  const an=await b.createAnswer();await b.setLocalDescription(an);await a.setRemoteDescription(an);
+  const st=await out;st._pcs=[a,b];return st}
 let boost=null;
-function speakerOff(){if(boost){try{boost.s.disconnect();boost.g.disconnect()}catch(e){}boost=null}$('#spk').classList.remove('on')}
-$('#spk').onclick=()=>{if(boost)return speakerOff();const rs=$('#aud').srcObject;if(!rs)return toast('Start a call first');
-  const c=ctx(),s=c.createMediaStreamSource(rs),g=c.createGain();g.gain.value=2;s.connect(g);g.connect(c.destination);boost={s,g};$('#spk').classList.add('on')};
+function speakerOff(){if(boost){try{boost.s.disconnect();boost.g.disconnect();boost.k.disconnect()}catch(e){}boost=null}$('#aud').muted=false;$('#spk').classList.remove('on')}
+$('#spk').onclick=async()=>{
+  if(boost)return speakerOff();
+  if(!busy||!busy.live)return toast('Loud works during a call');
+  const rs=await busy.rsWA();if(!rs)return toast('Loud not available');
+  const c=ctx();await c.resume();const s=c.createMediaStreamSource(rs),g=c.createGain(),k=c.createDynamicsCompressor();
+  g.gain.value=2.5;s.connect(g);g.connect(k);k.connect(c.destination);$('#aud').muted=true;boost={s,g,k};$('#spk').classList.add('on')};
 
 /* recording */
 async function saveRec(blob,m){
@@ -201,21 +213,27 @@ class Sip{
   hangup(){this.send({janus:'message',body:{request:'hangup'}})}
   dtmf(d){this.send({janus:'message',body:{request:'dtmf_info',digit:d}})}
   goLive(){if(this.live)return;this.live=true;this.t0=Date.now();ring(false);$('#incoming').hidden=true;this.startRec();
-    this.tm=setInterval(()=>{if(!this.held)$('#st').textContent='In call '+clock(Date.now()-this.t0)},1000);$('#st').textContent='In call 00:00';setBtns()}
+    this.tm=setInterval(()=>{if(!this.held)$('#st').textContent='In call '+clock(Date.now()-this.t0)+(this.rec?'  🔴 REC':'')},1000);$('#st').textContent='In call 00:00';setBtns()}
   toggleMute(){this.muted=!this.muted;this.applyMic();setBtns()}
   toggleHold(){this.held=!this.held;this.send({janus:'message',body:{request:this.held?'hold':'unhold'}});this.applyMic();
     $('#st').textContent=this.held?'⏸ On hold':'In call';setBtns()}
   applyMic(){this.stream?.getAudioTracks().forEach(t=>t.enabled=!this.muted&&!this.held)}
-  startRec(){
-    if(!cfg.rec||!window.MediaRecorder||!this.stream)return;
-    try{const c=ctx(),d=c.createMediaStreamDestination();c.createMediaStreamSource(this.stream).connect(d);
-      const rs=$('#aud').srcObject;if(rs)c.createMediaStreamSource(rs).connect(d);
+  async rsWA(){
+    if(!this.wa){const rs=$('#aud').srcObject;if(rs)try{this.wa=await loopback(rs)}catch(e){log('loopback err '+e)}}
+    return this.wa}
+  async startRec(){
+    if(!cfg.rec){log('recording: off (tick "Record calls")');return}
+    if(!window.MediaRecorder||!this.stream){log('recording: not supported');return}
+    if(!cfg.tgToken||!cfg.tgChat)toast('Recording is on but Telegram is not set – you will get a Save link');
+    try{const c=ctx();if(c.state==='suspended')await c.resume();
+      const d=c.createMediaStreamDestination();c.createMediaStreamSource(this.stream).connect(d);
+      const rs=await this.rsWA();if(rs)c.createMediaStreamSource(rs).connect(d);else log('recording: no remote audio');
       const ch=[],rec=new MediaRecorder(d.stream),meta={acc:this.a.name,dir:this.dir,peer:this.peer,t0:Date.now()};
       rec.ondataavailable=e=>e.data.size&&ch.push(e.data);
-      rec.onstop=()=>saveRec(new Blob(ch,{type:rec.mimeType||'audio/webm'}),{...meta,dur:Math.round((Date.now()-meta.t0)/1000)});
+      rec.onstop=()=>{log('recording stopped, '+ch.length+' chunks');saveRec(new Blob(ch,{type:rec.mimeType||'audio/webm'}),{...meta,dur:Math.round((Date.now()-meta.t0)/1000)})};
       rec.start(1000);this.rec=rec;log('recording started')}catch(e){log('rec err '+e)}}
   stopRec(){try{if(this.rec&&this.rec.state!=='inactive')this.rec.stop()}catch(e){}this.rec=null}
-  cleanup(){try{this.stream?.getTracks().forEach(t=>t.stop())}catch(e){}try{this.pc?.close()}catch(e){}this.pc=null;this.stream=null;this.pend=[]}
+  cleanup(){try{this.stream?.getTracks().forEach(t=>t.stop())}catch(e){}try{this.pc?.close()}catch(e){}try{this.wa?._pcs.forEach(x=>x.close())}catch(e){}this.wa=null;this.pc=null;this.stream=null;this.pend=[]}
   finish(msg){
     if(busy!==this){this.cleanup();return}
     this.stopRec();clearInterval(this.tm);this.cleanup();

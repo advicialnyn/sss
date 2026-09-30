@@ -3,265 +3,285 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>4-in-1 Dialer</title>
+<title>Dialer</title>
 <style>
 :root{--bg:#0f1115;--card:#181b22;--line:#262a34;--tx:#e8eaf0;--mut:#8b91a1;--ac:#4ade80;--bad:#f87171;--warn:#fbbf24}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{margin:0;background:var(--bg);color:var(--tx);font:16px system-ui,sans-serif;padding:12px;max-width:480px;margin:auto}
+[hidden]{display:none!important}
+body{margin:0 auto;background:var(--bg);color:var(--tx);font:16px system-ui,sans-serif;padding:12px;max-width:480px}
+header{display:flex;justify-content:space-between;align-items:center;position:relative}
 h1{font-size:18px;margin:4px 0 10px}
+#add{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ac);font-size:22px;line-height:1}
+#addmenu{position:absolute;right:0;top:40px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px;z-index:5;display:flex;flex-direction:column;gap:6px}
+#addmenu button{background:#20242e;color:var(--tx);border:0;border-radius:8px;padding:10px 16px;font-size:14px}
 .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.tab{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;color:var(--tx);text-align:left;font-size:14px}
+.tab{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;color:var(--tx);text-align:left;font-size:14px;min-width:0}
 .tab.on{border-color:var(--ac)}
-.tab small{display:block;color:var(--mut);font-size:12px;margin-top:2px}
+.tab small{display:block;color:var(--mut);font-size:12px;margin-top:2px;overflow:hidden;text-overflow:ellipsis}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mut);margin-right:6px}
 .dot.ok{background:var(--ac)}.dot.bad{background:var(--bad)}.dot.wait{background:var(--warn)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:10px}
-.numrow{display:flex;align-items:center;gap:6px}#bs{background:#20242e;border:0;color:var(--tx);font-size:22px;border-radius:12px;padding:8px 14px}
-#num{flex:1;min-width:0;font-size:26px;text-align:center;background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--tx);padding:8px;outline:0}
+#num{width:100%;font-size:26px;text-align:center;background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--tx);padding:8px;outline:0}
 #st{text-align:center;color:var(--mut);font-size:13px;min-height:20px;margin:6px 0}
 .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}
-.pad button{background:#20242e;border:0;color:var(--tx);font-size:22px;padding:14px 0;border-radius:12px}
-.row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
-.row button{border:0;border-radius:12px;padding:14px 0;font-size:15px;color:#fff}
-#call{background:#16a34a}#hang{background:#dc2626}#mute{background:#374151}
+.pad button{background:#20242e;border:0;color:var(--tx);font-size:22px;padding:13px 0;border-radius:12px;user-select:none}
+.row,.row2{display:grid;gap:8px;margin-top:8px}
+.row{grid-template-columns:repeat(3,1fr)}.row2{grid-template-columns:1fr 1fr}
+.row button,.row2 button{border:0;border-radius:12px;padding:13px 0;font-size:15px;color:#fff;background:#374151}
+.row button.on{outline:2px solid var(--ac)}
+#call{background:#16a34a!important}#hang{background:#dc2626!important}
 button:disabled{opacity:.4}
 details summary{cursor:pointer;color:var(--mut);font-size:14px}
 label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
-input.f{width:100%;background:#0f1115;border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:8px;font-size:14px}
-#log{font:11px ui-monospace,monospace;color:var(--mut);max-height:130px;overflow:auto;white-space:pre-wrap}
+.f{width:100%;background:#0f1115;border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:8px;font-size:14px}
+#log{font:11px ui-monospace,monospace;color:var(--mut);max-height:140px;overflow:auto;white-space:pre-wrap}
+#incoming{border-color:var(--ac);text-align:center}
+#inwho{font-size:20px;font-weight:600}
+#toast{position:fixed;left:12px;right:12px;bottom:14px;background:#111;border:1px solid var(--line);padding:10px;border-radius:10px;text-align:center;font-size:14px}
+#recs div{font-size:12px;margin-top:6px;word-break:break-all}
 </style>
 </head>
 <body>
-<h1>📞 4-in-1 Dialer <small style="color:#8b91a1;font-size:11px">v5</small></h1>
+<header>
+  <h1>📞 Dialer <small style="color:#8b91a1;font-size:11px">v6</small></h1>
+  <div><button id="add" title="Add account">+</button>
+    <div id="addmenu" hidden><button data-t="amarip">Amarip</button><button data-t="webvoice">Webvoice</button></div></div>
+</header>
 <div class="tabs" id="tabs"></div>
 
+<div class="card" id="incoming" hidden>
+  <div id="inwho"></div><div id="inacc" style="color:var(--mut);font-size:13px"></div>
+  <div class="row2"><button id="ans" style="background:#16a34a">Answer</button><button id="dec" style="background:#dc2626">Decline</button></div>
+</div>
+
 <div class="card">
-  <div class="numrow"><input id="num" inputmode="tel" placeholder="Number" autocomplete="off"><button id="bs" title="Delete (hold to clear)">⌫</button></div>
+  <input id="num" inputmode="tel" placeholder="Number" autocomplete="off">
   <div id="st">Pick an account</div>
   <div class="pad" id="pad"></div>
-  <div class="row">
-    <button id="call">Call</button>
-    <button id="mute" disabled>Mute</button>
-    <button id="hang" disabled>Hang up</button>
-  </div>
+  <div class="row"><button id="mute" disabled>Mute</button><button id="hold" disabled>Hold</button><button id="spk">🔊 Loud</button></div>
+  <div class="row2"><button id="call">Call</button><button id="hang" disabled>Hang up</button></div>
 </div>
 
-<div class="card" id="incoming" style="display:none">
-  <div id="inwho" style="margin-bottom:8px"></div>
-  <div class="row" style="grid-template-columns:1fr 1fr">
-    <button id="ans" style="background:#16a34a">Answer</button>
-    <button id="dec" style="background:#dc2626">Decline</button>
-  </div>
-</div>
-
-<div class="card">
-  <details id="setbox">
-    <summary>⚙ Account settings (saved only in this browser)</summary>
-    <div id="set"></div>
-  </details>
-</div>
+<div class="card"><details id="setbox"><summary>⚙ Account settings</summary><div id="set"></div></details></div>
+<div class="card"><details><summary>🎙 Call recording → Telegram</summary>
+  <label><input type="checkbox" id="rec"> Record calls</label>
+  <label>Bot token</label><input class="f" id="tgt" type="password" autocomplete="off">
+  <label>Channel ID (like -100123…, bot must be channel admin)</label><input class="f" id="tgc" autocomplete="off">
+  <div style="font-size:12px;color:var(--mut);margin-top:8px">Saved only in this browser. If upload fails you get a Save link.</div>
+</details><div id="recs"></div></div>
 <div class="card"><details><summary>Log</summary><button id="cp" style="margin:8px 0;padding:8px 12px;border:0;border-radius:8px;background:#374151;color:#fff">Copy log</button><div id="log"></div></details></div>
+<div id="toast" hidden></div>
 <audio id="aud" autoplay playsinline></audio>
 
 <script>
 const $=s=>document.querySelector(s);
-const HOST='127.0.0.1:5060';
-const DEF=[
- {name:'Amarip 1',ws:'wss://amarip.net/janus-ws',host:HOST,user:'',auth:'',secret:'',ice:'stun:sip.amarip.net:3478'},
- {name:'Amarip 2',ws:'wss://amarip.net/janus-ws',host:HOST,user:'',auth:'',secret:'',ice:'stun:sip.amarip.net:3478'},
- {name:'Webvoice 1',ws:'wss://billing.webvoice.net/janus-ws',host:HOST,user:'',auth:'',secret:'',ice:'stun:stun.l.google.com:19302'},
- {name:'Webvoice 2',ws:'wss://billing.webvoice.net/janus-ws',host:HOST,user:'',auth:'',secret:'',ice:'stun:stun.l.google.com:19302'}
-];
-let accts;
-try{accts=JSON.parse(localStorage.getItem('dialer4')||'null')}catch(e){}
-if(!accts||accts.length!==4)accts=DEF;
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const TYPES={amarip:{ws:'wss://amarip.net/janus-ws',ice:'stun:sip.amarip.net:3478'},webvoice:{ws:'wss://billing.webvoice.net/janus-ws',ice:'stun:stun.l.google.com:19302'}};
+const mk=(t,n)=>({name:n,ws:TYPES[t].ws,host:'127.0.0.1:5060',user:'',auth:'',secret:'',ice:TYPES[t].ice,iceUser:'',icePass:'',fmt:'local'});
+const DEF=()=>[mk('amarip','Amarip 1'),mk('amarip','Amarip 2'),mk('webvoice','Webvoice 1'),mk('webvoice','Webvoice 2')];
+const ld=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))||d}catch(e){return d}};
+let accts=ld('dialer4',null);if(!Array.isArray(accts)||!accts.length)accts=DEF();
+const cfg=ld('dialer4cfg',{rec:false,tgToken:'',tgChat:''});
 const save=()=>{try{localStorage.setItem('dialer4',JSON.stringify(accts))}catch(e){}};
+const saveCfg=()=>{try{localStorage.setItem('dialer4cfg',JSON.stringify(cfg))}catch(e){}};
+function log(t){const l=$('#log');l.textContent=(l.textContent+new Date().toLocaleTimeString()+' '+t+'\n').slice(-9000);l.scrollTop=l.scrollHeight}
+function toast(t){const d=$('#toast');d.textContent=t;d.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>d.hidden=true,4000)}
+const fmtNum=(a,n)=>{const f=a.fmt||'local';return f==='noplus'?n.replace(/^\+/,''):f==='local'?n.replace(/^\+?880/,'0'):n};
+const clock=ms=>{const s=Math.floor(ms/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
 
-function log(t){const l=$('#log');l.textContent+=new Date().toLocaleTimeString()+' '+t+'\n';l.scrollTop=l.scrollHeight}
+/* audio helpers */
+let AC;const ctx=()=>AC||(AC=new(window.AudioContext||window.webkitAudioContext)());
+let wl;const keepAwake=async()=>{try{wl=await navigator.wakeLock.request('screen')}catch(e){}};
+document.addEventListener('pointerdown',()=>{try{ctx().resume()}catch(e){}
+  if('Notification' in window&&Notification.permission==='default')Notification.requestPermission();keepAwake()},{once:true});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)keepAwake()});
+let ringT;
+function ring(on){clearInterval(ringT);navigator.vibrate&&navigator.vibrate(0);if(!on)return;
+  const beep=()=>{try{const c=ctx(),o=c.createOscillator(),g=c.createGain();o.frequency.value=440;g.gain.value=.15;o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+.5)}catch(e){}
+    navigator.vibrate&&navigator.vibrate([400,200,400])};
+  beep();ringT=setInterval(beep,2000)}
+let boost=null;
+function speakerOff(){if(boost){try{boost.s.disconnect();boost.g.disconnect()}catch(e){}boost=null}$('#spk').classList.remove('on')}
+$('#spk').onclick=()=>{if(boost)return speakerOff();const rs=$('#aud').srcObject;if(!rs)return toast('Start a call first');
+  const c=ctx(),s=c.createMediaStreamSource(rs),g=c.createGain();g.gain.value=2;s.connect(g);g.connect(c.destination);boost={s,g};$('#spk').classList.add('on')};
 
-/* ---------- Janus SIP client ---------- */
+/* recording */
+async function saveRec(blob,m){
+  const ext=blob.type.includes('ogg')?'ogg':blob.type.includes('mp4')?'m4a':'webm',t=new Date(m.t0),p=n=>String(n).padStart(2,'0');
+  const name=`${m.acc.replace(/\W+/g,'')}_${m.peer.replace(/[^\d+]/g,'')}_${t.getFullYear()}${p(t.getMonth()+1)}${p(t.getDate())}-${p(t.getHours())}${p(t.getMinutes())}${p(t.getSeconds())}.${ext}`;
+  const row=document.createElement('div');row.textContent='⏳ '+name;$('#recs').prepend(row);
+  const url=URL.createObjectURL(blob);
+  const fail=e=>{row.innerHTML=`❌ ${esc(name)} (${esc(e)}) <a href="${url}" download="${esc(name)}" style="color:var(--ac)">Save</a>`};
+  if(!cfg.tgToken||!cfg.tgChat)return fail('Telegram not set');
+  try{const fd=new FormData();fd.append('chat_id',cfg.tgChat);
+    fd.append('caption',`${m.dir==='in'?'📥 Incoming from':'📤 Outgoing to'} ${m.peer}\n👤 ${m.acc}\n🕒 ${t.toLocaleString()}\n⏱ ${m.dur}s`);
+    fd.append('document',blob,name);
+    const r=await fetch(`https://api.telegram.org/bot${cfg.tgToken}/sendDocument`,{method:'POST',body:fd}),j=await r.json();
+    if(!j.ok)return fail(j.description);row.textContent='✅ '+name;
+  }catch(e){fail(e.message)}
+}
+
+/* Janus SIP client (one per account, all stay registered) */
+let accts_,clients=[],cur=0,busy=null;
 class Sip{
-  constructor(a,ui){this.a=a;this.ui=ui;this.tx={};this.pc=null;this.stream=null;this.muted=false;this.inJsep=null}
-  send(o,cb){
-    o.transaction=Math.random().toString(36).slice(2,12);
-    if(cb)this.tx[o.transaction]=cb;
-    if(this.sid)o.session_id=this.sid;
-    if(this.hid&&o.janus==='message')o.handle_id=this.hid;
-    this.ws.send(JSON.stringify(o));
-  }
+  constructor(i){this.i=i;this.a=accts[i];this.tx={};this.status='wait';this.msg='';this.pend=[]}
+  st(k,t){this.status=k;this.msg=t;tabs();if(cur===this.i&&!busy)$('#st').textContent=t}
+  send(o,cb){o.transaction=Math.random().toString(36).slice(2,12);if(cb)this.tx[o.transaction]=cb;
+    if(this.sid)o.session_id=this.sid;if(this.hid&&o.janus==='message')o.handle_id=this.hid;
+    try{this.ws.send(JSON.stringify(o))}catch(e){}}
   connect(){
     const a=this.a;
-    this.ui.state('wait','Connecting…');
-    try{this.ws=new WebSocket(a.ws,'janus-protocol')}catch(e){this.ui.state('bad','Bad WS URL');return}
-    this.ws.onopen=()=>{
-      log('ws open');
-      this.send({janus:'create'},m=>{
-        this.sid=m.data.id;
-        this.ka=setInterval(()=>this.send({janus:'keepalive'}),25000);
-        this.send({janus:'attach',plugin:'janus.plugin.sip'},m2=>{
-          this.hid=m2.data.id;
-          this.send({janus:'message',body:{request:'register',username:`sip:${a.user}@${a.host}`,authuser:a.auth||a.user,display_name:a.user,secret:a.secret,proxy:`sip:${a.host}`}});
-          this.ui.state('wait','Registering…');
-        });
+    if(!a.user||!a.secret){this.st('bad','Fill in settings');return}
+    this.closing=false;this.sid=this.hid=null;this.tx={};this.st('wait','Connecting…');
+    try{this.ws=new WebSocket(a.ws,'janus-protocol')}catch(e){this.st('bad','Bad WS URL');return}
+    this.ws.onopen=()=>this.send({janus:'create'},m=>{
+      this.sid=m.data.id;this.ka=setInterval(()=>this.send({janus:'keepalive'}),25000);
+      this.send({janus:'attach',plugin:'janus.plugin.sip'},m2=>{
+        this.hid=m2.data.id;this.st('wait','Registering…');
+        this.send({janus:'message',body:{request:'register',username:`sip:${a.user}@${a.host}`,authuser:a.auth||a.user,display_name:a.user,secret:a.secret,proxy:`sip:${a.host}`}});
       });
-    };
+    });
     this.ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch(_){return}
-      log('← '+e.data.slice(0,300));
-      if(m.janus==='error'){this.ui.state('bad',m.error?.reason||'Janus error');return}
-      if(m.transaction&&this.tx[m.transaction]&&m.janus!=='ack'&&m.janus!=='event'){const cb=this.tx[m.transaction];delete this.tx[m.transaction];cb(m);return}
+      if(m.janus!=='ack')log(a.name+' ← '+e.data.replace(/\s+/g,' ').slice(0,220));
+      if(m.janus==='error'){this.st('bad',m.error?.reason||'Janus error');return}
       if(m.janus==='trickle'){this.onTrickle(m.candidate);return}
+      if(m.transaction&&this.tx[m.transaction]&&m.janus!=='ack'&&m.janus!=='event'){const cb=this.tx[m.transaction];delete this.tx[m.transaction];cb(m);return}
       if(m.janus==='event')this.onEvent(m);
     };
-    this.ws.onerror=()=>{log('ws error');this.ui.state('bad','Connection failed')};
-    this.ws.onclose=()=>{clearInterval(this.ka);if(!this.closing)this.ui.state('bad','Disconnected');this.cleanup()};
-  }
-  onEvent(m){
-    const pd=m.plugindata||m.plugin_data;
-    const r=pd?.data?.result,err=pd?.data?.error;
-    if(err){this.ui.state('bad',err);return}
-    if(!r)return;
-    const ev=r.event;
-    if(ev==='registered')this.ui.state('ok','Ready');
-    else if(ev==='registration_failed')this.ui.state('bad','Login failed: '+(r.reason||r.code||''));
-    else if(ev==='calling')this.ui.call('Calling…');
-    else if(ev==='ringing')this.ui.call('Ringing…');
-    else if(ev==='progress'){if(m.jsep&&this.pc)this.setRemote(m.jsep).catch(x=>log('remote err '+x));this.ui.call('Early media…')}
-    else if(ev==='accepted'){if(m.jsep&&this.pc&&this.pc.signalingState==='have-local-offer')this.setRemote(m.jsep).catch(x=>log('remote err '+x));this.ui.call('In call ✔',true)}
-    else if(ev==='hangup'){this.ui.state('ok','Ready');this.ui.idle('Call ended'+(r.reason?': '+r.reason:''));this.cleanup()}
-    else if(ev==='incomingcall'){this.inJsep=m.jsep;this.ui.incoming(r.displayname||r.username||'Unknown')}
-  }
-  onTrickle(c){
-    if(!c||c.completed||!c.candidate)return;
-    if(this.pc&&this.pc.remoteDescription)this.pc.addIceCandidate(c).catch(x=>log('cand err '+x));
-    else(this.pend=this.pend||[]).push(c);
-  }
-  async setRemote(jsep){
-    await this.pc.setRemoteDescription(jsep);
-    const q=this.pend||[];this.pend=[];
-    for(const c of q)await this.pc.addIceCandidate(c).catch(x=>log('cand err '+x));
-    log('remote set, '+q.length+' queued cands added');
-  }
-  mkpc(){
-    const a=this.a;
-    const urls=(a.ice||'').split(',').map(x=>x.trim()).filter(Boolean);
-    const srv=urls.length?[Object.assign({urls},a.iceUser?{username:a.iceUser,credential:a.icePass}:{})]:[];
-    const pc=new RTCPeerConnection({iceServers:srv});
-    pc.ontrack=e=>{
-      log('remote track '+e.track.kind);
-      const au=$('#aud');au.srcObject=e.streams[0]||new MediaStream([e.track]);
-      au.play().catch(x=>log('play: '+x));
-    };
-    clearInterval(this.st);
-    this.st=setInterval(async()=>{
-      if(!this.pc)return;
-      const r=await this.pc.getStats();const o=[];
-      r.forEach(x=>{
-        if(x.type==='inbound-rtp'&&x.kind==='audio')o.push('IN '+x.bytesReceived+'B');
-        if(x.type==='outbound-rtp'&&x.kind==='audio')o.push('OUT '+x.bytesSent+'B');
-        if(x.type==='candidate-pair'&&x.nominated&&x.state==='succeeded')o.push('pair ok');
-      });
-      log('stats: '+(o.join(' | ')||'no working pair'));
-    },3000);
-    pc.onicecandidate=e=>{if(e.candidate)log('cand '+e.candidate.type+' '+(e.candidate.address||''))};
-    pc.oniceconnectionstatechange=()=>{
-      log('ICE '+pc.iceConnectionState);
-      if(pc.iceConnectionState==='failed')$('#st').textContent='⚠ Audio link failed (ICE) – TURN login needed?';
-    };
-    this.pc=pc;return pc;
-  }
-  gather(pc){return new Promise(res=>{
-    if(pc.iceGatheringState==='complete')return res();
-    pc.onicegatheringstatechange=()=>{if(pc.iceGatheringState==='complete')res()};
-    setTimeout(res,3000);
-  })}
-  async mic(pc){
-    this.stream=await navigator.mediaDevices.getUserMedia({audio:true});
-    this.stream.getTracks().forEach(t=>pc.addTrack(t,this.stream));
-  }
-  async call(num){
-    try{
-      const pc=this.mkpc();await this.mic(pc);
-      const o=await pc.createOffer();await pc.setLocalDescription(o);await this.gather(pc);
-      this.send({janus:'message',body:{request:'call',uri:`sip:${num}@${this.a.host}`},jsep:{type:'offer',sdp:pc.localDescription.sdp}});
-      this.ui.call('Dialing…');
-    }catch(e){this.ui.idle('Mic/call error: '+e.message);this.cleanup()}
-  }
-  async answer(){
-    try{
-      const pc=this.mkpc();await this.mic(pc);
-      await this.setRemote(this.inJsep);
-      const an=await pc.createAnswer();await pc.setLocalDescription(an);await this.gather(pc);
-      this.send({janus:'message',body:{request:'accept'},jsep:{type:'answer',sdp:pc.localDescription.sdp}});
-    }catch(e){this.ui.idle('Answer error: '+e.message);this.cleanup()}
-  }
-  decline(){this.send({janus:'message',body:{request:'decline'}})}
-  hangup(){this.send({janus:'message',body:{request:'hangup'}})}
-  dtmf(d){this.send({janus:'message',body:{request:'dtmf_info',digit:d}})}
-  toggleMute(){this.muted=!this.muted;this.stream?.getAudioTracks().forEach(t=>t.enabled=!this.muted);return this.muted}
-  cleanup(){
-    try{this.stream?.getTracks().forEach(t=>t.stop())}catch(e){}
-    try{this.pc?.close()}catch(e){}
-    clearInterval(this.st);this.pend=[];
-    this.pc=null;this.stream=null;this.muted=false;this.inJsep=null;
-    $('#mute').textContent='Mute';
+    this.ws.onerror=()=>log(a.name+' ws error');
+    this.ws.onclose=()=>{clearInterval(this.ka);if(busy===this)this.finish('Disconnected');
+      if(!this.closing){this.st('bad','Disconnected – retrying…');setTimeout(()=>{if(!this.closing)this.connect()},5000)}};
   }
   close(){this.closing=true;clearInterval(this.ka);try{this.ws.close()}catch(e){}}
+  onEvent(m){
+    const pd=m.plugindata||m.plugin_data,r=pd?.data?.result,err=pd?.data?.error;
+    if(err){this.st('bad',err);return}
+    if(!r)return;const ev=r.event,say=t=>{if(busy===this)$('#st').textContent=t};
+    if(ev==='registered')this.st('ok','Ready');
+    else if(ev==='registration_failed')this.st('bad','Login failed: '+(r.reason||r.code||''));
+    else if(ev==='calling')say('Calling…');
+    else if(ev==='ringing')say('Ringing…');
+    else if(ev==='progress'){if(m.jsep&&this.pc)this.setRemote(m.jsep).catch(x=>log('remote err '+x));say('Early media…')}
+    else if(ev==='accepted'){if(m.jsep&&this.pc&&this.pc.signalingState==='have-local-offer')this.setRemote(m.jsep).catch(x=>log('remote err '+x));this.goLive()}
+    else if(ev==='hangup')this.finish('Call ended'+(r.reason?': '+r.reason:''));
+    else if(ev==='incomingcall')this.onIncoming(r,m.jsep);
+  }
+  onIncoming(r,jsep){
+    const who=(/sip:([^@;>]+)/.exec(r.username||'')||[])[1]||r.displayname||'Unknown';
+    if(busy){this.send({janus:'message',body:{request:'decline'}});toast('Missed (busy): '+who+' → '+this.a.name);log('busy, declined '+who);return}
+    busy=this;this.dir='in';this.peer=who;this.inJsep=jsep;this.live=false;
+    cur=this.i;tabs();renderSet();setBtns();
+    $('#inwho').textContent=who+' is calling…';$('#inacc').textContent='on '+this.a.name;$('#incoming').hidden=false;ring(true);
+    if(document.hidden&&window.Notification&&Notification.permission==='granted')try{new Notification('Incoming call',{body:who+' → '+this.a.name})}catch(e){}
+  }
+  onTrickle(c){if(!c||c.completed||!c.candidate)return;
+    if(this.pc&&this.pc.remoteDescription)this.pc.addIceCandidate(c).catch(x=>log('cand err '+x));else this.pend.push(c)}
+  async setRemote(j){await this.pc.setRemoteDescription(j);const q=this.pend;this.pend=[];
+    for(const c of q)await this.pc.addIceCandidate(c).catch(x=>log('cand err '+x))}
+  mkpc(){
+    const a=this.a,urls=(a.ice||'').split(',').map(x=>x.trim()).filter(Boolean);
+    const pc=new RTCPeerConnection({iceServers:urls.length?[Object.assign({urls},a.iceUser?{username:a.iceUser,credential:a.icePass}:{})]:[]});
+    pc.ontrack=e=>{const au=$('#aud');au.srcObject=e.streams[0]||new MediaStream([e.track]);au.play().catch(x=>log('play: '+x))};
+    pc.oniceconnectionstatechange=()=>{log('ICE '+pc.iceConnectionState);if(pc.iceConnectionState==='failed')$('#st').textContent='⚠ Audio link failed'};
+    this.pc=pc;return pc}
+  gather(pc){return new Promise(res=>{if(pc.iceGatheringState==='complete')return res();
+    pc.onicegatheringstatechange=()=>{if(pc.iceGatheringState==='complete')res()};setTimeout(res,3000)})}
+  async mic(pc){this.stream=await navigator.mediaDevices.getUserMedia({audio:true});this.stream.getTracks().forEach(t=>pc.addTrack(t,this.stream))}
+  async call(num,shown){
+    busy=this;this.dir='out';this.peer=shown;this.live=false;this.pend=[];setBtns();$('#st').textContent='Dialing…';
+    try{const pc=this.mkpc();await this.mic(pc);const o=await pc.createOffer();await pc.setLocalDescription(o);await this.gather(pc);
+      this.send({janus:'message',body:{request:'call',uri:`sip:${num}@${this.a.host}`},jsep:{type:'offer',sdp:pc.localDescription.sdp}});
+    }catch(e){this.finish('Mic/call error: '+e.message)}}
+  async answer(){
+    $('#incoming').hidden=true;ring(false);$('#st').textContent='Connecting…';
+    try{const pc=this.mkpc();await this.mic(pc);await this.setRemote(this.inJsep);const an=await pc.createAnswer();await pc.setLocalDescription(an);await this.gather(pc);
+      this.send({janus:'message',body:{request:'accept'},jsep:{type:'answer',sdp:pc.localDescription.sdp}});
+    }catch(e){this.finish('Answer error: '+e.message)}}
+  decline(){this.send({janus:'message',body:{request:'decline'}});$('#incoming').hidden=true;ring(false);busy=null;setBtns();$('#st').textContent=this.msg}
+  hangup(){this.send({janus:'message',body:{request:'hangup'}})}
+  dtmf(d){this.send({janus:'message',body:{request:'dtmf_info',digit:d}})}
+  goLive(){if(this.live)return;this.live=true;this.t0=Date.now();ring(false);$('#incoming').hidden=true;this.startRec();
+    this.tm=setInterval(()=>{if(!this.held)$('#st').textContent='In call '+clock(Date.now()-this.t0)},1000);$('#st').textContent='In call 00:00';setBtns()}
+  toggleMute(){this.muted=!this.muted;this.applyMic();setBtns()}
+  toggleHold(){this.held=!this.held;this.send({janus:'message',body:{request:this.held?'hold':'unhold'}});this.applyMic();
+    $('#st').textContent=this.held?'⏸ On hold':'In call';setBtns()}
+  applyMic(){this.stream?.getAudioTracks().forEach(t=>t.enabled=!this.muted&&!this.held)}
+  startRec(){
+    if(!cfg.rec||!window.MediaRecorder||!this.stream)return;
+    try{const c=ctx(),d=c.createMediaStreamDestination();c.createMediaStreamSource(this.stream).connect(d);
+      const rs=$('#aud').srcObject;if(rs)c.createMediaStreamSource(rs).connect(d);
+      const ch=[],rec=new MediaRecorder(d.stream),meta={acc:this.a.name,dir:this.dir,peer:this.peer,t0:Date.now()};
+      rec.ondataavailable=e=>e.data.size&&ch.push(e.data);
+      rec.onstop=()=>saveRec(new Blob(ch,{type:rec.mimeType||'audio/webm'}),{...meta,dur:Math.round((Date.now()-meta.t0)/1000)});
+      rec.start(1000);this.rec=rec;log('recording started')}catch(e){log('rec err '+e)}}
+  stopRec(){try{if(this.rec&&this.rec.state!=='inactive')this.rec.stop()}catch(e){}this.rec=null}
+  cleanup(){try{this.stream?.getTracks().forEach(t=>t.stop())}catch(e){}try{this.pc?.close()}catch(e){}this.pc=null;this.stream=null;this.pend=[]}
+  finish(msg){
+    if(busy!==this){this.cleanup();return}
+    this.stopRec();clearInterval(this.tm);this.cleanup();
+    busy=null;this.live=this.held=this.muted=false;
+    ring(false);$('#incoming').hidden=true;speakerOff();$('#st').textContent=msg;setBtns()}
 }
 
-/* ---------- UI ---------- */
-let cur=-1,cl=null,inCall=false,st=[];
+/* UI */
+function setBtns(){const b=busy,l=!!(b&&b.live);
+  $('#call').disabled=!!b;$('#hang').disabled=!b||(b.dir==='in'&&!l);$('#mute').disabled=$('#hold').disabled=!l;
+  $('#mute').textContent=b&&b.muted?'Unmute':'Mute';$('#mute').classList.toggle('on',!!(b&&b.muted));
+  $('#hold').textContent=b&&b.held?'Resume':'Hold';$('#hold').classList.toggle('on',!!(b&&b.held))}
 function tabs(){
-  $('#tabs').innerHTML=accts.map((a,i)=>`<button class="tab ${i===cur?'on':''}" data-i="${i}"><span class="dot ${i===cur?(st[0]||''):''}"></span>${a.name}<small>${a.user||'not set'}</small></button>`).join('');
-  document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>pick(+b.dataset.i));
-}
-const ui={
-  state(k,t){st[0]=k;$('#st').textContent=t;tabs()},
-  call(t,connected){inCall=true;$('#st').textContent=t;$('#call').disabled=true;$('#hang').disabled=false;$('#mute').disabled=!connected&&false;$('#mute').disabled=false;$('#incoming').style.display='none'},
-  idle(t){inCall=false;$('#st').textContent=t;$('#call').disabled=false;$('#hang').disabled=true;$('#mute').disabled=true;$('#incoming').style.display='none'},
-  incoming(who){$('#inwho').textContent='📲 Incoming: '+who;$('#incoming').style.display='block'}
-};
-function pick(i){
-  if(inCall){alert('Finish the current call first');return}
-  if(cl){cl.close();cl=null}
-  cur=i;st=[];tabs();renderSet();
-  const a=accts[i];
-  if(!a.user||!a.secret){ui.state('bad','Fill in settings for this account');$('#setbox').open=true;return}
-  cl=new Sip(a,ui);cl.connect();
-}
+  $('#tabs').innerHTML=accts.map((a,i)=>`<button class="tab ${i===cur?'on':''}" data-i="${i}"><span class="dot ${clients[i]?clients[i].status:''}"></span>${esc(a.name)}<small>${esc(a.user||'not set')}</small></button>`).join('');
+  document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>pick(+b.dataset.i))}
+function pick(i){if(busy)return toast('Finish the current call first');cur=i;tabs();renderSet();$('#st').textContent=clients[i]?clients[i].msg:''}
 function renderSet(){
-  const a=accts[cur<0?0:cur],i=cur<0?0:cur;
-  const f=(k,l,t='text')=>`<label>${l}</label><input class="f" type="${t}" data-k="${k}" value="${(a[k]||'').replace(/"/g,'&quot;')}" autocomplete="off">`;
-  $('#set').innerHTML=`<div style="margin-top:8px;color:var(--mut);font-size:12px">Editing: ${a.name}</div>`+
+  const a=accts[cur];if(!a)return;
+  const f=(k,l,t='text')=>`<label>${l}</label><input class="f" type="${t}" data-k="${k}" value="${esc(a[k])}" autocomplete="off">`;
+  $('#set').innerHTML=`<div style="margin-top:8px;color:var(--mut);font-size:12px">Editing: ${esc(a.name)}</div>`+
     f('name','Label')+f('user','SIP number / username')+f('auth','Auth user (blank = same as number)')+f('secret','SIP secret / password','password')+
-    f('ws','Janus WebSocket URL')+f('host','SIP host:port')+f('ice','STUN/TURN URL(s), comma separated')+f('iceUser','TURN username (optional)')+f('icePass','TURN password (optional)','password');
-  document.querySelectorAll('#set input').forEach(inp=>inp.oninput=()=>{accts[i][inp.dataset.k]=inp.value;save();tabs()});
-}
-// keypad
-$('#pad').innerHTML=['1','2','3','4','5','6','7','8','9','*','0','#'].map(k=>`<button data-k="${k}">${k}</button>`).join('');
-document.querySelectorAll('#pad button').forEach(b=>b.onclick=()=>{
-  $('#num').value+=b.dataset.k;
-  if(inCall&&cl)cl.dtmf(b.dataset.k);
-});
-(()=>{let t;const bs=$('#bs');
- const del=()=>{const n=$('#num');n.value=n.value.slice(0,-1)};
- bs.onpointerdown=()=>{t=setTimeout(()=>{$('#num').value='';t=null},600)};
- bs.onpointerup=()=>{if(t){clearTimeout(t);del()}};
- bs.onpointerleave=()=>clearTimeout(t);
- bs.oncontextmenu=e=>e.preventDefault();})();
-$('#call').onclick=()=>{
-  if(!cl){$('#st').textContent='Pick an account first';return}
-  const n=$('#num').value.trim().replace(/[^\d+*#]/g,'');
-  if(!n){$('#st').textContent='Enter a number';return}
-  cl.call(n);
-};
-$('#hang').onclick=()=>cl&&cl.hangup();
-$('#mute').onclick=()=>{if(cl)$('#mute').textContent=cl.toggleMute()?'Unmute':'Mute'};
-$('#ans').onclick=()=>cl&&cl.answer();
-$('#dec').onclick=()=>{cl&&cl.decline();$('#incoming').style.display='none'};
-$('#cp').onclick=async()=>{const t=$('#log').textContent.replace(/\n\s+/g,' ');
-  try{await navigator.clipboard.writeText(t);$('#cp').textContent='Copied ✔'}catch(e){$('#cp').textContent='Copy failed'}
-  setTimeout(()=>$('#cp').textContent='Copy log',1500)};
-tabs();renderSet();
+    f('ws','Janus WebSocket URL')+f('host','SIP host:port')+f('ice','STUN/TURN URL(s), comma separated')+f('iceUser','TURN username (optional)')+f('icePass','TURN password (optional)','password')+
+    `<label>Dial format</label><select class="f" data-k="fmt"><option value="local">+880… → 0… (local)</option><option value="noplus">Remove + only</option><option value="asis">As typed</option></select>
+     <div class="row2"><button id="recon">Save &amp; reconnect</button><button id="del" style="background:#7f1d1d">Delete account</button></div>`;
+  $('#set select').value=a.fmt||'local';
+  document.querySelectorAll('#set [data-k]').forEach(inp=>inp.oninput=inp.onchange=()=>{a[inp.dataset.k]=inp.value;save();tabs()});
+  $('#recon').onclick=()=>{if(busy===clients[cur])return toast('Finish the call first');clients[cur].close();clients[cur]=new Sip(cur);clients[cur].connect()};
+  $('#del').onclick=()=>{if(busy)return toast('Finish the call first');if(!confirm('Delete '+a.name+'?'))return;
+    clients[cur].close();accts.splice(cur,1);clients.splice(cur,1);
+    if(!accts.length){accts.push(mk('amarip','Amarip 1'));clients.push(new Sip(0))}
+    clients.forEach((c,i)=>c.i=i);save();cur=0;tabs();renderSet()}}
+
+/* keypad */
+$('#pad').innerHTML=[...'123456789*0#'].map(k=>`<button data-k="${k}">${k}</button>`).join('')+'<button data-k="+">+</button><button id="pst" style="font-size:15px">Paste</button><button id="bs">⌫</button>';
+const add=k=>{$('#num').value+=k;if(busy&&busy.live&&k!=='+')busy.dtmf(k)};
+document.querySelectorAll('#pad [data-k]').forEach(b=>{const k=b.dataset.k;
+  if(k==='0'){let t;b.onpointerdown=()=>{t=setTimeout(()=>{t=null;$('#num').value+='+'},500)};
+    b.onpointerup=()=>{if(t){clearTimeout(t);add('0')}};b.onpointerleave=()=>clearTimeout(t);b.oncontextmenu=e=>e.preventDefault()}
+  else b.onclick=()=>add(k)});
+(()=>{let t;const bs=$('#bs');bs.onpointerdown=()=>{t=setTimeout(()=>{$('#num').value='';t=null},600)};
+  bs.onpointerup=()=>{if(t){clearTimeout(t);$('#num').value=$('#num').value.slice(0,-1)}};bs.onpointerleave=()=>clearTimeout(t);bs.oncontextmenu=e=>e.preventDefault()})();
+$('#pst').onclick=()=>navigator.clipboard.readText().then(t=>$('#num').value=t.replace(/[^\d+*#]/g,'')).catch(()=>toast('Paste blocked – long-press the number field'));
+
+/* buttons */
+$('#call').onclick=()=>{const c=clients[cur];if(!c||c.status!=='ok')return toast('This account is not ready');
+  const n=$('#num').value.trim().replace(/[^\d+*#]/g,'');if(!n)return toast('Enter a number');c.call(fmtNum(c.a,n),n)};
+$('#hang').onclick=()=>busy&&busy.hangup();
+$('#mute').onclick=()=>busy&&busy.toggleMute();
+$('#hold').onclick=()=>busy&&busy.toggleHold();
+$('#ans').onclick=()=>busy&&busy.answer();
+$('#dec').onclick=()=>busy&&busy.decline();
+$('#add').onclick=()=>$('#addmenu').hidden=!$('#addmenu').hidden;
+document.querySelectorAll('#addmenu button').forEach(b=>b.onclick=()=>{
+  const t=b.dataset.t,n=accts.filter(a=>a.name.toLowerCase().startsWith(t)).length+1;
+  accts.push(mk(t,(t==='amarip'?'Amarip ':'Webvoice ')+n));save();const i=accts.length-1;
+  clients.push(new Sip(i));clients[i].connect();$('#addmenu').hidden=true;if(!busy)pick(i);$('#setbox').open=true});
+$('#cp').onclick=async()=>{try{await navigator.clipboard.writeText($('#log').textContent);$('#cp').textContent='Copied ✔'}catch(e){$('#cp').textContent='Copy failed'}setTimeout(()=>$('#cp').textContent='Copy log',1500)};
+
+/* recording settings */
+$('#rec').checked=!!cfg.rec;$('#tgt').value=cfg.tgToken||'';$('#tgc').value=cfg.tgChat||'';
+$('#rec').onchange=()=>{cfg.rec=$('#rec').checked;saveCfg()};
+$('#tgt').oninput=()=>{cfg.tgToken=$('#tgt').value.trim();saveCfg()};
+$('#tgc').oninput=()=>{cfg.tgChat=$('#tgc').value.trim();saveCfg()};
+
+/* start: register every account */
+clients=accts.map((a,i)=>new Sip(i));tabs();renderSet();clients.forEach(c=>c.connect());
 </script>
 </body>
 </html>

@@ -43,7 +43,7 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
 </head>
 <body>
 <header>
-  <h1>📞 Dialer <small style="color:#8b91a1;font-size:11px">v7</small></h1>
+  <h1>📞 Dialer <small style="color:#8b91a1;font-size:11px">v8</small></h1>
   <div><button id="add" title="Add account">+</button>
     <div id="addmenu" hidden><button data-t="amarip">Amarip</button><button data-t="webvoice">Webvoice</button></div></div>
 </header>
@@ -67,6 +67,7 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
   <label><input type="checkbox" id="rec"> Record calls</label>
   <label>Bot token</label><input class="f" id="tgt" type="password" autocomplete="off">
   <label>Channel ID (like -100123…, bot must be channel admin)</label><input class="f" id="tgc" autocomplete="off">
+  <div class="row2"><button id="tgtest">Test Telegram</button><div id="tgres" style="font-size:13px;align-self:center"></div></div>
   <div style="font-size:12px;color:var(--mut);margin-top:8px">Saved only in this browser. If upload fails you get a Save link.</div>
 </details><div id="recs"></div></div>
 <div class="card"><details><summary>Log</summary><button id="cp" style="margin:8px 0;padding:8px 12px;border:0;border-radius:8px;background:#374151;color:#fff">Copy log</button><div id="log"></div></details></div>
@@ -297,6 +298,12 @@ $('#rec').checked=!!cfg.rec;$('#tgt').value=cfg.tgToken||'';$('#tgc').value=cfg.
 $('#rec').onchange=()=>{cfg.rec=$('#rec').checked;saveCfg()};
 $('#tgt').oninput=()=>{cfg.tgToken=$('#tgt').value.trim();saveCfg()};
 $('#tgc').oninput=()=>{cfg.tgChat=$('#tgc').value.trim();saveCfg()};
+
+$('#tgtest').onclick=async()=>{const o=$('#tgres');o.textContent='Testing…';const B='https://api.telegram.org/bot'+cfg.tgToken;
+  try{const r=await(await fetch(B+'/getMe')).json();if(!r.ok)return o.textContent='❌ Token: '+r.description;
+    const m=await(await fetch(B+'/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:cfg.tgChat,text:'✅ Dialer test'})})).json();
+    o.textContent=m.ok?'✅ @'+r.result.username+' works – check the channel':'❌ Channel: '+m.description+' (token is valid)'}
+  catch(e){o.textContent='❌ '+e.message}};
 
 /* start: register every account */
 clients=accts.map((a,i)=>new Sip(i));tabs();renderSet();clients.forEach(c=>c.connect());

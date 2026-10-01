@@ -37,7 +37,17 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
 #log{font:11px ui-monospace,monospace;color:var(--mut);max-height:140px;overflow:auto;white-space:pre-wrap}
 #incoming{border-color:var(--ac);text-align:center}
 .inwho{font-size:20px;font-weight:600}
-#toast{position:fixed;left:12px;right:12px;bottom:14px;background:#111;border:1px solid var(--line);padding:10px;border-radius:10px;text-align:center;font-size:14px}
+#toast{z-index:200;position:fixed;left:12px;right:12px;bottom:14px;background:#111;border:1px solid var(--line);padding:10px;border-radius:10px;text-align:center;font-size:14px}
+#callscr{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;overflow:auto}
+#callscr .cin{width:100%;max-width:400px}
+.cwho{font-size:30px;font-weight:600;text-align:center;word-break:break-all}
+#cnum,#cacc,#cdtmf{color:var(--mut);text-align:center;min-height:18px}
+#cst{font-size:20px;text-align:center;margin:12px 0 18px}
+#callscr #hang{width:100%;margin-top:12px;padding:16px;font-size:17px}
+#incoming.full{position:fixed;inset:0;z-index:60;margin:0;border-radius:0;display:flex;flex-direction:column;justify-content:center;background:var(--bg)}
+#incoming.full #ringlist{width:100%;max-width:400px;margin:auto;text-align:center}
+#incoming.full .inwho{font-size:30px}
+#incoming.banner{position:fixed;top:8px;left:8px;right:8px;z-index:70;margin:0}
 #pbmsg{min-height:18px}
 .pbrow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;padding:8px 10px;background:#20242e;border-radius:10px}
 .pbrow span{flex:1;cursor:pointer}.pbrow button{background:#374151;border:0;color:#fff;border-radius:8px;padding:6px 10px}
@@ -45,8 +55,18 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
 </style>
 </head>
 <body>
+<div id="lockscreen" style="position:fixed;inset:0;background:var(--bg);z-index:99;display:flex;align-items:center;justify-content:center;padding:20px">
+  <div class="card" style="width:100%;max-width:380px;margin:0">
+    <h1 id="lkh"></h1><div id="lkt" style="color:var(--mut);font-size:13px"></div>
+    <label>Passcode</label><input class="f" id="lkp" type="password" autocomplete="off">
+    <div id="lkc" hidden><label>Repeat passcode</label><input class="f" id="lkp2" type="password" autocomplete="off"></div>
+    <div class="row2" style="grid-template-columns:1fr"><button id="lkgo" style="background:#16a34a"></button></div>
+    <div id="lkm" style="font-size:13px;margin-top:8px;color:var(--bad);min-height:18px"></div>
+    <button id="lkreset" style="background:none;border:0;color:var(--mut);font-size:12px;padding:0">Forgot passcode? Reset saved secrets</button>
+  </div>
+</div>
 <header>
-  <h1>📞 Dialer <small style="color:#8b91a1;font-size:11px">v16</small></h1>
+  <h1>📞 Dialer <small style="color:#8b91a1;font-size:11px">v19</small></h1>
   <div><button id="add" title="Add account">+</button>
     <div id="addmenu" hidden><button data-t="amarip">Amarip</button><button data-t="webvoice">Webvoice</button></div></div>
 </header>
@@ -59,13 +79,12 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
   <input id="num" inputmode="tel" placeholder="Number" autocomplete="off">
   <div id="st">Pick an account</div>
   <div class="pad" id="pad"></div>
-  <div class="row"><button id="mute" disabled>Mute</button><button id="hold" disabled>Hold</button><button id="spk">🔊 Loud</button></div>
-  <div class="row2"><button id="call">Call</button><button id="hang" disabled>Hang up</button></div>
+  <div class="row2" style="grid-template-columns:1fr"><button id="call">Call</button></div>
 </div>
 
 <div class="card"><details id="pbbox"><summary>📒 Phonebook (passcode protected)</summary>
-  <div id="pblock"><label>Passcode (6+ characters – don't forget it, it can't be recovered)</label>
-    <input class="f" id="pbpass" type="password" autocomplete="off">
+  <div id="pblock"><div id="pbpassbox"><label>Passcode (6+ characters – don't forget it, it can't be recovered)</label>
+    <input class="f" id="pbpass" type="password" autocomplete="off"></div>
     <div class="row2" style="grid-template-columns:1fr"><button id="pbgo">🔓 Unlock / create</button></div></div>
   <div id="pbopen" hidden>
     <input class="f" id="pbq" placeholder="Search name or number" style="margin-top:8px">
@@ -92,6 +111,13 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
 <div class="card" id="recsCard" hidden><b>Recordings (this session)</b><div id="recs"></div></div>
 <div class="card"><details><summary>Log</summary><button id="cp" style="margin:8px 0;padding:8px 12px;border:0;border-radius:8px;background:#374151;color:#fff">Copy log</button><div id="log"></div></details></div>
 <div id="toast" hidden></div>
+<div id="callscr" hidden><div class="cin">
+  <div class="cwho" id="cwho"></div><div id="cnum"></div><div id="cacc"></div><div id="cst"></div>
+  <div class="row"><button id="mute" disabled>Mute</button><button id="hold" disabled>Hold</button><button id="spk">🔊 Loud</button></div>
+  <div class="row2"><button id="ckpbtn">⌨ Keypad</button><button id="out">🔈 Earpiece / speaker</button></div>
+  <div id="cdtmf"></div><div class="pad" id="ckp" hidden></div>
+  <button id="hang" disabled>Hang up</button>
+</div></div>
 <audio id="aud" autoplay playsinline></audio>
 
 <script>
@@ -103,8 +129,10 @@ const DEF=()=>[mk('amarip','Amarip 1'),mk('amarip','Amarip 2'),mk('webvoice','We
 const ld=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))||d}catch(e){return d}};
 let accts=ld('dialer4',null);if(!Array.isArray(accts)||!accts.length)accts=DEF();
 const old=ld('dialer4cfg',{});const cfg=ld('dialer4cfg2',{rec:true,tgToken:old.tgToken||'',tgChat:old.tgChat||''});
-const save=()=>{try{localStorage.setItem('dialer4',JSON.stringify(accts))}catch(e){}};
-const saveCfg=()=>{try{localStorage.setItem('dialer4cfg2',JSON.stringify(cfg))}catch(e){}};
+let vKey=null,vSalt=null,sessPass=null;const VK='dialer4vault';
+const SECRET=['secret','pPass','icePass','tgToken','token'],strip=(k,v)=>SECRET.includes(k)?'':v;
+const save=()=>{if(!vKey)return;try{localStorage.setItem('dialer4',JSON.stringify(accts,strip))}catch(e){}vaultSave()};
+const saveCfg=()=>{if(!vKey)return;try{localStorage.setItem('dialer4cfg2',JSON.stringify(cfg,strip))}catch(e){}vaultSave()};
 function log(t){const l=$('#log');l.textContent=(l.textContent+new Date().toLocaleTimeString()+' '+t+'\n').slice(-9000);l.scrollTop=l.scrollHeight}
 function toast(t){const d=$('#toast');d.textContent=t;d.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>d.hidden=true,4000)}
 const fmtNum=(a,n)=>{const f=a.fmt||'local';return f==='noplus'?n.replace(/^\+/,''):f==='local'?n.replace(/^\+?880/,'0'):n};
@@ -129,6 +157,9 @@ async function loopback(stream){ /* Chrome can't feed remote WebRTC audio to Web
   const o=await a.createOffer();await a.setLocalDescription(o);await b.setRemoteDescription(o);
   const an=await b.createAnswer();await b.setLocalDescription(an);await a.setRemoteDescription(an);
   const st=await out;st._pcs=[a,b];return st}
+let outIdx=-1;
+const outputs=async()=>{try{return(await navigator.mediaDevices.enumerateDevices()).filter(x=>x.kind==='audiooutput')}catch(e){return[]}};
+const setOut=async(au,d)=>{if(au.setSinkId&&d)try{await au.setSinkId(d.deviceId);return true}catch(e){log('setSinkId err '+e)}return false};
 let boost=null;
 function speakerOff(){if(boost){try{boost.s.disconnect();boost.g.disconnect();boost.k.disconnect()}catch(e){}if(boost.au)boost.au.muted=false;boost=null}$('#spk').classList.remove('on')}
 $('#spk').onclick=async()=>{
@@ -234,9 +265,12 @@ class Sip{
   decline(){this.send({janus:'message',body:{request:'decline'}});this.ringing=false;ringers=ringers.filter(x=>x!==this);renderRing()}
   hangup(){this.send({janus:'message',body:{request:'hangup'}})}
   dtmf(d){this.send({janus:'message',body:{request:'dtmf_info',digit:d}})}
-  goLive(){if(this.live)return;this.live=true;this.t0=Date.now();this.startRec();
+  goLive(){if(this.live)return;this.live=true;this.t0=Date.now();this.startRec();this.autoOut();
     this.tm=setInterval(()=>{if(!this.held)$('#st').textContent='In call '+clock(Date.now()-this.t0)+(this.rec?'  🔴 REC':'')},1000);$('#st').textContent='In call 00:00';setBtns()}
   toggleMute(){this.muted=!this.muted;this.applyMic();setBtns()}
+  async autoOut(){outIdx=-1;const o=await outputs();
+    log('audio outputs: '+(o.map(x=>x.label||x.deviceId).join(' | ')||'none')+(this.au.setSinkId?'':' (setSinkId unsupported)'));
+    const e=o.find(x=>/earpiece|handset|receiver/i.test(x.label));if(e&&await setOut(this.au,e))log('output set to '+e.label)}
   setHold(on){this.held=on;this.send({janus:'message',body:{request:on?'hold':'unhold'}});this.applyMic();this.au.muted=on}
   toggleHold(){this.setHold(!this.held);$('#st').textContent=this.held?'⏸ On hold':'In call';setBtns()}
   applyMic(){this.stream?.getAudioTracks().forEach(t=>t.enabled=!this.muted&&!this.held)}
@@ -304,7 +338,8 @@ function renderRing(){
   const box=$('#incoming');
   if(!ringers.length){box.hidden=true;ring(false);return}
   box.hidden=false;
-  $('#ringlist').innerHTML=ringers.map((c,k)=>`<div style="margin-bottom:12px"><div class="inwho">${esc(c.peer)} is calling…</div><div style="color:var(--mut);font-size:13px">on ${esc(c.a.name)}${busy?' · answering puts your current call on hold':''}</div><div class="row2"><button data-a="${k}" style="background:#16a34a">Answer</button><button data-d="${k}" style="background:#dc2626">Decline</button></div></div>`).join('');
+  box.className=busy?'card banner':'card full';
+  $('#ringlist').innerHTML=ringers.map((c,k)=>`<div style="margin-bottom:12px"><div class="inwho">${esc(nameFor(c.peer)||c.peer)} is calling…</div><div style="color:var(--mut);font-size:13px">${nameFor(c.peer)?esc(c.peer)+' · ':''}on ${esc(c.a.name)}${busy?' · answering puts your current call on hold':''}</div><div class="row2"><button data-a="${k}" style="background:#16a34a">Answer</button><button data-d="${k}" style="background:#dc2626">Decline</button></div></div>`).join('');
   $('#ringlist').querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>takeCall(ringers[+b.dataset.a]));
   $('#ringlist').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>ringers[+b.dataset.d].decline());
   if(!ringOn)ring(true)}
@@ -312,11 +347,15 @@ function renderMissed(){
   $('#missedCard').hidden=!missed.length;
   $('#missed').innerHTML=missed.map((m,k)=>`<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px"><span>${esc(m.who)} <small style="color:var(--mut)">${esc(m.acc)} · ${new Date(m.t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</small></span><button data-m="${k}" style="background:#374151;border:0;color:#fff;border-radius:8px;padding:6px 10px">Call back</button></div>`).join('');
   document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{$('#num').value=missed[+b.dataset.m].who;window.scrollTo(0,0)})}
-function addMissed(c){missed.unshift({who:c.peer,acc:c.a.name,t:Date.now()});missed=missed.slice(0,20);try{localStorage.setItem('dialer4missed',JSON.stringify(missed))}catch(e){}renderMissed()}
-$('#clrmiss').onclick=()=>{missed=[];try{localStorage.removeItem('dialer4missed')}catch(e){}renderMissed()};
+function addMissed(c){missed.unshift({who:c.peer,acc:c.a.name,t:Date.now()});missed=missed.slice(0,20);vaultSave();renderMissed()}
+$('#clrmiss').onclick=()=>{missed=[];vaultSave();renderMissed()};
 
 /* UI */
+function nameFor(n){const d=x=>String(x||'').replace(/\D/g,'').slice(-10);if(!d(n))return'';const c=(pbList||[]).find(c=>d(c.number)===d(n));return c?c.name:''}
 function setBtns(){const b=busy,l=!!(b&&b.live);
+  $('#callscr').hidden=!b;
+  if(b){const nm=nameFor(b.peer);$('#cwho').textContent=nm||b.peer||'';$('#cnum').textContent=nm?b.peer:'';$('#cacc').textContent=(b.dir==='in'?'Incoming on ':'Calling from ')+b.a.name}
+  else{$('#ckp').hidden=true;$('#cdtmf').textContent=''}
   $('#call').disabled=!!b;$('#hang').disabled=!b||(b.dir==='in'&&!l);$('#mute').disabled=$('#hold').disabled=!l;
   $('#mute').textContent=b&&b.muted?'Unmute':'Mute';$('#mute').classList.toggle('on',!!(b&&b.muted));
   $('#hold').textContent=b&&b.held?'Resume':'Hold';$('#hold').classList.toggle('on',!!(b&&b.held))}
@@ -355,6 +394,13 @@ $('#pst').onclick=()=>navigator.clipboard.readText().then(t=>$('#num').value=t.r
 /* buttons */
 $('#call').onclick=()=>{const c=clients[cur];if(!c||c.status!=='ok')return toast('This account is not ready');
   const n=$('#num').value.trim().replace(/[^\d+*#]/g,'');if(!n)return toast('Enter a number');c.call(fmtNum(c.a,n),n)};
+$('#out').onclick=async()=>{const c=busy;if(!c||!c.live)return toast('Switch output during a call');
+  const o=await outputs();if(!c.au.setSinkId||o.length<2)return toast('This browser offers only one audio output'+(o.length?' ('+(o[0].label||'default')+')':''));
+  outIdx=(outIdx+1)%o.length;toast(await setOut(c.au,o[outIdx])?'🔈 '+(o[outIdx].label||'Output '+(outIdx+1)):'Could not switch')};
+$('#ckp').innerHTML=[...'123456789*0#'].map(k=>`<button data-k="${k}">${k}</button>`).join('');
+$('#ckpbtn').onclick=()=>$('#ckp').hidden=!$('#ckp').hidden;
+$('#ckp').querySelectorAll('button').forEach(b=>b.onclick=()=>{if(busy&&busy.live){busy.dtmf(b.dataset.k);$('#cdtmf').textContent+=b.dataset.k}});
+new MutationObserver(()=>$('#cst').textContent=$('#st').textContent).observe($('#st'),{childList:true,characterData:true,subtree:true});
 $('#hang').onclick=()=>busy&&busy.hangup();
 $('#mute').onclick=()=>busy&&busy.toggleMute();
 $('#hold').onclick=()=>busy&&busy.toggleHold();
@@ -409,7 +455,7 @@ async function pbSave(){
   catch(e){if(/409|422/.test(e.message)){try{await ghGet();await ghPut(text);return toast('Saved to GitHub ✔')}catch(e2){e=e2}}
     toast('Saved on phone only – '+e.message)}}
 async function pbUnlock(){
-  const pass=$('#pbpass').value;if(pass.length<6)return pbMsg('Passcode must be 6+ characters');
+  const usingSess=!$('#pbpass').value&&!!sessPass,pass=usingSess?sessPass:$('#pbpass').value;if(pass.length<6)return pbMsg('Passcode must be 6+ characters');
   pbMsg('Unlocking…');let text=null,failed=false,missing=false;
   try{const r=await ghGet();if(r&&r.text)text=r.text;if(r&&r.missing)missing=true}catch(e){failed=true;log('phonebook: '+e.message)}
   if(!text)text=localStorage.getItem('dialer4pb');
@@ -418,7 +464,7 @@ async function pbUnlock(){
     if(text){await decBook(text,pass);try{localStorage.setItem('dialer4pb',text)}catch(e){}}
     else{if(!confirm('No phonebook found. Create a new one with this passcode? It cannot be recovered if you forget it.'))return pbMsg('');
       pbSalt=crypto.getRandomValues(new Uint8Array(16));pbKey=await deriveKey(pass,pbSalt);pbList=[];await pbSave()}
-  }catch(e){pbKey=null;return pbMsg('❌ Wrong passcode (or damaged file)')}
+  }catch(e){pbKey=null;if(usingSess){$('#pbpassbox').hidden=false;return pbMsg('Phonebook has a different passcode – type it below')}return pbMsg('❌ Wrong passcode (or damaged file)')}
   $('#pbpass').value='';pbMsg('');pbShow();pbTouch()}
 function pbLock(){pbKey=null;pbSalt=null;pbList=[];clearTimeout(pbT);pbShow();pbMsg('🔒 Locked')}
 function pbTouch(){clearTimeout(pbT);if(pbKey)pbT=setTimeout(pbLock,5*60*1000)}
@@ -440,9 +486,43 @@ document.addEventListener('pointerdown',pbTouch);
 [['ghrepo','repo'],['ghbranch','branch'],['ghpath','path'],['ghtok','token']].forEach(([id,k])=>{$('#'+id).value=cfg.gh[k]||'';$('#'+id).oninput=()=>{cfg.gh[k]=$('#'+id).value.trim();saveCfg()}});
 
 /* start: register every account */
-renderMissed();clients=accts.map((a,i)=>new Sip(i));tabs();renderSet();clients.forEach(c=>c.connect());
-const autoBal=()=>accts.forEach((a,i)=>{if(a.user&&a.secret)setTimeout(()=>refreshBal(i,false),i*600)});
-autoBal();setInterval(autoBal,5*60*1000);
+/* ---------- vault: encrypts SIP secrets, tokens and missed calls with the passcode ---------- */
+async function vEncrypt(){
+  const iv=crypto.getRandomValues(new Uint8Array(12)),pl={a:accts.map(a=>({secret:a.secret||'',pPass:a.pPass||'',icePass:a.icePass||''})),t:cfg.tgToken||'',g:cfg.gh.token||'',m:missed};
+  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},vKey,new TextEncoder().encode(JSON.stringify(pl)));
+  return JSON.stringify({v:1,salt:b64(vSalt),iv:b64(iv),data:b64(ct)})}
+function vaultSave(){if(!vKey)return;clearTimeout(vaultSave.t);
+  vaultSave.t=setTimeout(async()=>{try{localStorage.setItem(VK,await vEncrypt())}catch(e){log('vault save err '+e)}},300)}
+async function lockGo(){
+  const pass=$('#lkp').value,m=t=>$('#lkm').textContent=t;
+  if(pass.length<6)return m('Passcode must be 6+ characters');
+  const blob=localStorage.getItem(VK);m('');
+  try{
+    if(blob){const o=JSON.parse(blob),salt=unb64(o.salt),key=await deriveKey(pass,salt);
+      const pl=JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(o.iv)},key,unb64(o.data))));
+      vSalt=salt;vKey=key;pl.a.forEach((x,i)=>{if(accts[i])Object.assign(accts[i],x)});cfg.tgToken=pl.t||'';cfg.gh.token=pl.g||'';missed=pl.m||[];
+    }else{
+      if(pass!==$('#lkp2').value)return m('Passcodes do not match');
+      vSalt=crypto.getRandomValues(new Uint8Array(16));vKey=await deriveKey(pass,vSalt);
+      localStorage.setItem(VK,await vEncrypt());
+      ['dialer4cfg','dialer4missed'].forEach(k=>localStorage.removeItem(k));save();saveCfg()}
+  }catch(e){vKey=null;return m('❌ Wrong passcode')}
+  sessPass=pass;$('#lkp').value=$('#lkp2').value='';$('#lockscreen').hidden=true;afterUnlock()}
+function afterUnlock(){
+  $('#tgt').value=cfg.tgToken||'';$('#ghtok').value=cfg.gh.token||'';
+  $('#pbpassbox').hidden=true;$('#pbgo').textContent='🔓 Open phonebook';
+  renderMissed();renderSet();
+  clients=accts.map((a,i)=>new Sip(i));tabs();clients.forEach(c=>c.connect());
+  const autoBal=()=>accts.forEach((a,i)=>{if(a.user&&a.secret)setTimeout(()=>refreshBal(i,false),i*600)});
+  autoBal();setInterval(autoBal,5*60*1000);
+  if(localStorage.getItem('dialer4pb'))pbUnlock()}
+(()=>{const has=!!localStorage.getItem(VK);
+  $('#lkh').textContent=has?'🔒 Dialer locked':'🔒 Create a passcode';
+  $('#lkt').textContent=has?'Enter your passcode to unlock your accounts.':"This encrypts your SIP secrets, tokens and missed calls on this phone, and also opens your phonebook. It can't be recovered if you forget it.";
+  $('#lkc').hidden=has;$('#lkgo').textContent=has?'Unlock':'Create & continue';
+  $('#lkgo').onclick=lockGo;$('#lkp').onkeydown=$('#lkp2').onkeydown=e=>{if(e.key==='Enter')lockGo()};
+  $('#lkreset').onclick=()=>{if(confirm('Erase the saved SIP secrets, tokens and missed calls on this phone? Your accounts stay, but you must enter their secrets again.')){localStorage.removeItem(VK);location.reload()}};
+  tabs();renderMissed()})();
 </script>
 </body>
 </html>

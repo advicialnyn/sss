@@ -52,22 +52,46 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
 .pbrow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;padding:8px 10px;background:#20242e;border-radius:10px}
 .pbrow span{flex:1;cursor:pointer}.pbrow button{background:#374151;border:0;color:#fff;border-radius:8px;padding:6px 10px}
 #recs div{font-size:12px;margin-top:6px;word-break:break-all}
+body{background:radial-gradient(120% 80% at 50% -10%,#1b2540 0%,#0f1115 55%) fixed}
+.card{box-shadow:0 8px 24px rgba(0,0,0,.25)}
+#logout{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--mut);font-size:16px;margin-right:8px}
+.pad button{height:60px;padding:0;border-radius:30px;background:#222733;font-size:22px}
+.pad button:active{background:#2c3342}
+#call{border-radius:30px;padding:16px;font-size:17px;font-weight:600}
+#callscr{background:radial-gradient(120% 90% at 50% 0%,#233a6b 0%,#0b0e14 62%)}
+#callscr .cin{text-align:center}
+#cav,.av{width:104px;height:104px;border-radius:50%;margin:0 auto 16px;background:linear-gradient(135deg,#4f7cff,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:44px;font-weight:600;color:#fff;position:relative}
+.pulse::after{content:"";position:absolute;inset:-8px;border-radius:50%;border:2px solid rgba(120,160,255,.6);animation:pl 1.4s ease-out infinite}
+@keyframes pl{from{transform:scale(.9);opacity:1}to{transform:scale(1.35);opacity:0}}
+#cst{display:inline-block;background:rgba(255,255,255,.1);padding:6px 16px;border-radius:999px;font-size:15px;margin:12px 0 26px}
+.ctl{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;justify-items:center}
+.ctl button{width:76px;height:76px;border-radius:50%;border:0;background:rgba(255,255,255,.1);color:#fff;font-size:12px;white-space:pre-line;line-height:1.3;padding:8px 0}
+.ctl button::first-line{font-size:26px}
+.ctl button.on{background:#fff;color:#111}
+#callscr #hang{width:78px;height:78px;border-radius:50%;margin:28px auto 0;display:block;padding:0;font-size:30px}
+#hang span{display:inline-block;transform:rotate(135deg)}
+#incoming.full{background:radial-gradient(120% 90% at 50% 0%,#233a6b 0%,#0b0e14 62%)}
+#ringlist .row2{gap:18px;margin-top:24px}
+#ringlist .row2 button{padding:18px;font-size:18px;border-radius:999px}
 </style>
 </head>
 <body>
-<div id="lockscreen" style="position:fixed;inset:0;background:var(--bg);z-index:99;display:flex;align-items:center;justify-content:center;padding:20px">
+<div id="lockscreen" style="position:fixed;inset:0;background:radial-gradient(120% 80% at 50% -10%,#1b2540 0%,#0f1115 60%);z-index:99;display:flex;align-items:center;justify-content:center;padding:20px">
   <div class="card" style="width:100%;max-width:380px;margin:0">
-    <h1 id="lkh"></h1><div id="lkt" style="color:var(--mut);font-size:13px"></div>
-    <label>Passcode</label><input class="f" id="lkp" type="password" autocomplete="off">
-    <div id="lkc" hidden><label>Repeat passcode</label><input class="f" id="lkp2" type="password" autocomplete="off"></div>
-    <div class="row2" style="grid-template-columns:1fr"><button id="lkgo" style="background:#16a34a"></button></div>
+    <h1>📞 Dialer</h1>
+    <label>Username</label><input class="f" id="lku" autocomplete="username" autocapitalize="none" autocorrect="off">
+    <label>Password (8+ characters)</label><input class="f" id="lkp" type="password" autocomplete="current-password">
+    <div id="lkc" hidden><label>Repeat password</label><input class="f" id="lkp2" type="password" autocomplete="new-password"></div>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:12px"><input type="checkbox" id="lkrem"> Keep me signed in on this phone</label>
+    <div class="row2" style="grid-template-columns:1fr"><button id="lkgo" style="background:#16a34a;border-radius:24px"></button></div>
+    <button id="lkmode" style="background:none;border:0;color:var(--ac);font-size:13px;margin-top:10px;padding:0"></button>
     <div id="lkm" style="font-size:13px;margin-top:8px;color:var(--bad);min-height:18px"></div>
-    <button id="lkreset" style="background:none;border:0;color:var(--mut);font-size:12px;padding:0">Forgot passcode? Reset saved secrets</button>
+    <div style="font-size:11px;color:var(--mut);margin-top:6px">There is no password reset. If you forget your password your saved data can't be recovered.</div>
   </div>
 </div>
 <header>
-  <h1>📞 Dialer <small style="color:#8b91a1;font-size:11px">v19</small></h1>
-  <div><button id="add" title="Add account">+</button>
+  <div><h1 style="margin-bottom:0">📞 Dialer <small style="color:#8b91a1;font-size:11px">v21</small></h1><div id="whoami" style="font-size:12px;color:var(--mut);margin-bottom:8px"></div></div>
+  <div style="display:flex;align-items:center"><button id="logout" title="Log out">⎋</button><button id="add" title="Add account">+</button>
     <div id="addmenu" hidden><button data-t="amarip">Amarip</button><button data-t="webvoice">Webvoice</button></div></div>
 </header>
 <div class="tabs" id="tabs"></div>
@@ -82,22 +106,13 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
   <div class="row2" style="grid-template-columns:1fr"><button id="call">Call</button></div>
 </div>
 
-<div class="card"><details id="pbbox"><summary>📒 Phonebook (passcode protected)</summary>
-  <div id="pblock"><div id="pbpassbox"><label>Passcode (6+ characters – don't forget it, it can't be recovered)</label>
-    <input class="f" id="pbpass" type="password" autocomplete="off"></div>
-    <div class="row2" style="grid-template-columns:1fr"><button id="pbgo">🔓 Unlock / create</button></div></div>
-  <div id="pbopen" hidden>
-    <input class="f" id="pbq" placeholder="Search name or number" style="margin-top:8px">
-    <div id="pblist"></div>
-    <div class="row2"><button id="pbadd">＋ Save typed number</button><button id="pblockbtn">🔒 Lock</button></div></div>
-  <div id="pbmsg"></div>
-  <details style="margin-top:8px"><summary>GitHub sync</summary>
-    <label>Repo (owner/name)</label><input class="f" id="ghrepo" autocomplete="off" placeholder="advicialnyn/my-repo">
-    <label>Branch</label><input class="f" id="ghbranch" autocomplete="off">
-    <label>File path</label><input class="f" id="ghpath" autocomplete="off">
-    <label>Access token (fine-grained, this repo only, Contents: read &amp; write)</label><input class="f" id="ghtok" type="password" autocomplete="off">
-    <div style="font-size:12px;color:var(--mut);margin-top:8px">Numbers are encrypted in your browser before upload. Use a private repo and a long passcode. Token is saved only in this browser.</div>
-  </details>
+<div class="card"><details id="ctbox"><summary>👥 Contacts</summary>
+  <input class="f" id="ctq" placeholder="Search name or number" style="margin-top:8px">
+  <div id="ctlist"></div>
+  <div class="row2" style="grid-template-columns:1fr"><button id="ctadd">＋ Save typed number</button></div>
+</details></div>
+<div class="card"><details><summary>👤 Account</summary>
+  <div class="row2"><button id="chpw">Change password</button><button id="delacct" style="background:#7f1d1d">Delete my data</button></div>
 </details></div>
 <div class="card"><details id="setbox"><summary>⚙ Account settings</summary><div id="set"></div></details></div>
 <div class="card"><details><summary>🎙 Call recording → Telegram</summary>
@@ -112,11 +127,14 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
 <div class="card"><details><summary>Log</summary><button id="cp" style="margin:8px 0;padding:8px 12px;border:0;border-radius:8px;background:#374151;color:#fff">Copy log</button><div id="log"></div></details></div>
 <div id="toast" hidden></div>
 <div id="callscr" hidden><div class="cin">
+  <div id="cav" class="pulse">👤</div>
   <div class="cwho" id="cwho"></div><div id="cnum"></div><div id="cacc"></div><div id="cst"></div>
-  <div class="row"><button id="mute" disabled>Mute</button><button id="hold" disabled>Hold</button><button id="spk">🔊 Loud</button></div>
-  <div class="row2"><button id="ckpbtn">⌨ Keypad</button><button id="out">🔈 Earpiece / speaker</button></div>
+  <div class="ctl">
+    <button id="mute" disabled>🎙&#10;Mute</button><button id="hold" disabled>⏸&#10;Hold</button><button id="spk">🔊&#10;Loud</button>
+    <button id="ckpbtn">⌨&#10;Keypad</button><button id="out">🔈&#10;Output</button>
+  </div>
   <div id="cdtmf"></div><div class="pad" id="ckp" hidden></div>
-  <button id="hang" disabled>Hang up</button>
+  <button id="hang" disabled><span>📞</span></button>
 </div></div>
 <audio id="aud" autoplay playsinline></audio>
 
@@ -127,12 +145,40 @@ const TYPES={amarip:{ws:'wss://amarip.net/janus-ws',ice:'stun:sip.amarip.net:347
 const mk=(t,n)=>({name:n,ws:TYPES[t].ws,host:'127.0.0.1:5060',user:'',auth:'',secret:'',ice:TYPES[t].ice,iceUser:'',icePass:'',fmt:'local'});
 const DEF=()=>[mk('amarip','Amarip 1'),mk('amarip','Amarip 2'),mk('webvoice','Webvoice 1'),mk('webvoice','Webvoice 2')];
 const ld=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))||d}catch(e){return d}};
-let accts=ld('dialer4',null);if(!Array.isArray(accts)||!accts.length)accts=DEF();
-const old=ld('dialer4cfg',{});const cfg=ld('dialer4cfg2',{rec:true,tgToken:old.tgToken||'',tgChat:old.tgChat||''});
-let vKey=null,vSalt=null,sessPass=null;const VK='dialer4vault';
-const SECRET=['secret','pPass','icePass','tgToken','token'],strip=(k,v)=>SECRET.includes(k)?'':v;
-const save=()=>{if(!vKey)return;try{localStorage.setItem('dialer4',JSON.stringify(accts,strip))}catch(e){}vaultSave()};
-const saveCfg=()=>{if(!vKey)return;try{localStorage.setItem('dialer4cfg2',JSON.stringify(cfg,strip))}catch(e){}vaultSave()};
+/* ===== OWNER SETTINGS – edit these 3 lines ===== */
+const GH_REPO='yourname/dialer-data';   // a PRIVATE repo used only to store the encrypted user files
+const GH_TOKEN=['github_pat_','PASTE_THE_REST_OF_THE_TOKEN_HERE'].join('');   // fine-grained token: only that repo, Contents read+write
+const APP_SALT='change-this-to-any-random-text';   // makes user file names unguessable
+/* ================================================ */
+let accts=DEF(),contacts=[],USER=localStorage.getItem('dialer_user')||'';
+const cfg={rec:true,tg:true,tgToken:'',tgChat:''};
+const legacy=(()=>{try{const a=JSON.parse(localStorage.getItem('dialer4'));return Array.isArray(a)&&a.length?a:null}catch(e){return null}})();
+const enc=new TextEncoder(),dec=new TextDecoder();
+const b64=u=>btoa(String.fromCharCode(...new Uint8Array(u))),unb64=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0));
+const hex=u=>[...new Uint8Array(u)].map(x=>x.toString(16).padStart(2,'0')).join('');
+const fpath=async u=>'u/'+hex(await crypto.subtle.digest('SHA-256',enc.encode(APP_SALT+':'+u))).slice(0,40)+'.json';
+const ghURL=p=>`https://api.github.com/repos/${GH_REPO}/contents/${p}`;
+const ghH=()=>({Authorization:'Bearer '+GH_TOKEN,Accept:'application/vnd.github+json'});
+async function ghGet(p){const r=await fetch(ghURL(p)+'?t='+Date.now(),{headers:ghH(),cache:'no-store'});
+  if(r.status===404)return null;if(!r.ok)throw new Error('GitHub '+r.status);const j=await r.json();return{sha:j.sha,text:atob(j.content.replace(/\n/g,''))}}
+async function ghPut(p,text,sha){const body={message:'update',content:btoa(text)};if(sha)body.sha=sha;
+  const r=await fetch(ghURL(p),{method:'PUT',headers:Object.assign({'Content-Type':'application/json'},ghH()),body:JSON.stringify(body)});
+  if(!r.ok)throw new Error('GitHub '+r.status);return(await r.json()).content.sha}
+const deriveKey=async(pw,salt)=>crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:200000,hash:'SHA-256'},await crypto.subtle.importKey('raw',enc.encode(pw),'PBKDF2',false,['deriveKey']),{name:'AES-GCM',length:256},true,['encrypt','decrypt']);
+let KEY=null,SALT=null,FPATH='',FSHA=null,syncT,lastSync='';
+const profileJSON=()=>JSON.stringify({accts,cfg,contacts,missed},(k,v)=>k==='bal'||k==='balAt'?undefined:v);
+async function seal(json){const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},KEY,enc.encode(json));return JSON.stringify({v:1,salt:b64(SALT),iv:b64(iv),data:b64(ct)})}
+const openFile=async(text,key)=>{const o=JSON.parse(text);return JSON.parse(dec.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(o.iv)},key,unb64(o.data))))};
+async function putFile(json){const text=await seal(json);
+  try{FSHA=await ghPut(FPATH,text,FSHA)}catch(e){if(!/409|422/.test(e.message))throw e;const f=await ghGet(FPATH);FSHA=await ghPut(FPATH,text,f&&f.sha)}lastSync=json}
+function sync(){if(!KEY)return;clearTimeout(syncT);
+  syncT=setTimeout(async()=>{const json=profileJSON();if(json===lastSync)return;try{await putFile(json)}catch(e){toast('Could not save online – '+e.message)}},800)}
+const save=sync,saveCfg=sync;
+function vaultSave(){sync()}
+function applyProfile(p){
+  p=p||{};accts=p.accts&&p.accts.length?p.accts:(legacy||DEF());
+  Object.assign(cfg,{rec:true,tg:true,tgToken:'',tgChat:''},p.cfg||{});contacts=p.contacts||[];missed=p.missed||[]}
 function log(t){const l=$('#log');l.textContent=(l.textContent+new Date().toLocaleTimeString()+' '+t+'\n').slice(-9000);l.scrollTop=l.scrollHeight}
 function toast(t){const d=$('#toast');d.textContent=t;d.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>d.hidden=true,4000)}
 const fmtNum=(a,n)=>{const f=a.fmt||'local';return f==='noplus'?n.replace(/^\+/,''):f==='local'?n.replace(/^\+?880/,'0'):n};
@@ -322,14 +368,14 @@ async function getBalance(i){
         if(b===undefined){const f=find(x.jj);if(f!==undefined){b=f;a.balPath=x.path;d+='  ← BALANCE FOUND: '+f}}}
       log(a.name+' '+x.path+' → '+d)}}
   if(b===undefined)throw new Error('no balance field found – copy the log to me');
-  a.bal=b;a.balAt=Date.now();save();tabs();return b}
+  a.bal=b;a.balAt=Date.now();tabs();return b}
 async function refreshBal(i,verbose){
   const o=$('#balres');if(verbose&&o)o.textContent='Checking…';
   try{const b=await getBalance(i);if(verbose&&o)o.textContent='💰 Balance: '+b}
   catch(e){const m=e instanceof TypeError?'Blocked by the site (CORS) – needs a proxy':e.message;log('balance: '+m);if(verbose&&o)o.textContent='❌ '+m}}
 
 /* incoming / waiting / missed calls */
-let ringers=[],heldCalls=[],missed=ld('dialer4missed',[]);
+let ringers=[],heldCalls=[],missed=[];
 function takeCall(c){
   ringers=ringers.filter(x=>x!==c);
   if(busy&&busy!==c){if(busy.live){busy.setHold(true);heldCalls.push(busy)}else busy.hangup()}
@@ -339,7 +385,7 @@ function renderRing(){
   if(!ringers.length){box.hidden=true;ring(false);return}
   box.hidden=false;
   box.className=busy?'card banner':'card full';
-  $('#ringlist').innerHTML=ringers.map((c,k)=>`<div style="margin-bottom:12px"><div class="inwho">${esc(nameFor(c.peer)||c.peer)} is calling…</div><div style="color:var(--mut);font-size:13px">${nameFor(c.peer)?esc(c.peer)+' · ':''}on ${esc(c.a.name)}${busy?' · answering puts your current call on hold':''}</div><div class="row2"><button data-a="${k}" style="background:#16a34a">Answer</button><button data-d="${k}" style="background:#dc2626">Decline</button></div></div>`).join('');
+  $('#ringlist').innerHTML=ringers.map((c,k)=>`<div style="margin-bottom:12px"><div class="av pulse">${esc(init(nameFor(c.peer)||c.peer))}</div><div class="inwho">${esc(nameFor(c.peer)||c.peer)} is calling…</div><div style="color:var(--mut);font-size:13px">${nameFor(c.peer)?esc(c.peer)+' · ':''}on ${esc(c.a.name)}${busy?' · answering puts your current call on hold':''}</div><div class="row2"><button data-a="${k}" style="background:#16a34a">📞 Answer</button><button data-d="${k}" style="background:#dc2626">✕ Decline</button></div></div>`).join('');
   $('#ringlist').querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>takeCall(ringers[+b.dataset.a]));
   $('#ringlist').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>ringers[+b.dataset.d].decline());
   if(!ringOn)ring(true)}
@@ -351,14 +397,15 @@ function addMissed(c){missed.unshift({who:c.peer,acc:c.a.name,t:Date.now()});mis
 $('#clrmiss').onclick=()=>{missed=[];vaultSave();renderMissed()};
 
 /* UI */
-function nameFor(n){const d=x=>String(x||'').replace(/\D/g,'').slice(-10);if(!d(n))return'';const c=(pbList||[]).find(c=>d(c.number)===d(n));return c?c.name:''}
+const init=s=>{const ch=String(s||'?').trim().charAt(0).toUpperCase();return/[\d+*#?]/.test(ch)?'👤':ch};
+function nameFor(n){const d=x=>String(x||'').replace(/\D/g,'').slice(-10);if(!d(n))return'';const c=contacts.find(c=>d(c.number)===d(n));return c?c.name:''}
 function setBtns(){const b=busy,l=!!(b&&b.live);
   $('#callscr').hidden=!b;
-  if(b){const nm=nameFor(b.peer);$('#cwho').textContent=nm||b.peer||'';$('#cnum').textContent=nm?b.peer:'';$('#cacc').textContent=(b.dir==='in'?'Incoming on ':'Calling from ')+b.a.name}
+  if(b){const nm=nameFor(b.peer);$('#cwho').textContent=nm||b.peer||'';$('#cnum').textContent=nm?b.peer:'';$('#cacc').textContent=(b.dir==='in'?'Incoming on ':'Calling from ')+b.a.name;$('#cav').textContent=init(nm||b.peer);$('#cav').classList.toggle('pulse',!l)}
   else{$('#ckp').hidden=true;$('#cdtmf').textContent=''}
   $('#call').disabled=!!b;$('#hang').disabled=!b||(b.dir==='in'&&!l);$('#mute').disabled=$('#hold').disabled=!l;
-  $('#mute').textContent=b&&b.muted?'Unmute':'Mute';$('#mute').classList.toggle('on',!!(b&&b.muted));
-  $('#hold').textContent=b&&b.held?'Resume':'Hold';$('#hold').classList.toggle('on',!!(b&&b.held))}
+  $('#mute').textContent=b&&b.muted?'🔇\nUnmute':'🎙\nMute';$('#mute').classList.toggle('on',!!(b&&b.muted));
+  $('#hold').textContent=b&&b.held?'▶\nResume':'⏸\nHold';$('#hold').classList.toggle('on',!!(b&&b.held))}
 function tabs(){
   $('#tabs').innerHTML=accts.map((a,i)=>`<button class="tab ${i===cur?'on':''}" data-i="${i}"><span class="dot ${clients[i]?clients[i].status:''}"></span>${esc(a.name)}<small>${esc(a.user||'not set')}${a.bal!==undefined?' · 💰 '+esc(a.bal):''}</small></button>`).join('');
   document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>pick(+b.dataset.i))}
@@ -425,104 +472,68 @@ $('#tgtest').onclick=async()=>{const o=$('#tgres');o.textContent='Testing…';co
     o.textContent=m.ok?'✅ @'+r.result.username+' works – check the channel':'❌ Channel: '+m.description+' (token is valid)'}
   catch(e){o.textContent='❌ '+e.message}};
 
-/* ---------- encrypted phonebook (AES-GCM, key from passcode via PBKDF2), synced to a GitHub file ---------- */
-cfg.gh=Object.assign({repo:'',branch:'main',path:'phonebook.enc.json',token:''},cfg.gh||{});
-const b64=u=>btoa(String.fromCharCode(...new Uint8Array(u))),unb64=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0));
-let pbKey=null,pbSalt=null,pbList=[],pbSha=null,pbT;
-const pbMsg=t=>$('#pbmsg').textContent=t;
-async function deriveKey(pass,salt){const km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pass),'PBKDF2',false,['deriveKey']);
-  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:200000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
-async function encBook(){const iv=crypto.getRandomValues(new Uint8Array(12));
-  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},pbKey,new TextEncoder().encode(JSON.stringify(pbList)));
-  return JSON.stringify({v:1,salt:b64(pbSalt),iv:b64(iv),data:b64(ct)})}
-async function decBook(text,pass){const o=JSON.parse(text),salt=unb64(o.salt),key=await deriveKey(pass,salt);
-  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(o.iv)},key,unb64(o.data));
-  pbSalt=salt;pbKey=key;pbList=JSON.parse(new TextDecoder().decode(pt))}
-const ghOn=()=>cfg.gh.repo&&cfg.gh.token;
-const ghUrl=()=>`https://api.github.com/repos/${cfg.gh.repo}/contents/${cfg.gh.path||'phonebook.enc.json'}`;
-const ghH=()=>({Authorization:'Bearer '+cfg.gh.token,Accept:'application/vnd.github+json'});
-async function ghGet(){if(!ghOn())return null;
-  const r=await fetch(ghUrl()+'?ref='+(cfg.gh.branch||'main')+'&t='+Date.now(),{headers:ghH(),cache:'no-store'});
-  if(r.status===404)return{missing:true};if(!r.ok)throw new Error('GitHub '+r.status);
-  const j=await r.json();pbSha=j.sha;return{text:atob(j.content.replace(/\n/g,''))}}
-async function ghPut(text){const body={message:'update phonebook',content:btoa(text),branch:cfg.gh.branch||'main'};if(pbSha)body.sha=pbSha;
-  const r=await fetch(ghUrl(),{method:'PUT',headers:Object.assign({'Content-Type':'application/json'},ghH()),body:JSON.stringify(body)});
-  if(!r.ok)throw new Error('GitHub '+r.status);pbSha=(await r.json()).content.sha}
-async function pbSave(){
-  const text=await encBook();try{localStorage.setItem('dialer4pb',text)}catch(e){}
-  if(!ghOn())return toast('Saved on this phone only (set GitHub sync to back up)');
-  try{await ghPut(text);toast('Saved to GitHub ✔')}
-  catch(e){if(/409|422/.test(e.message)){try{await ghGet();await ghPut(text);return toast('Saved to GitHub ✔')}catch(e2){e=e2}}
-    toast('Saved on phone only – '+e.message)}}
-async function pbUnlock(){
-  const usingSess=!$('#pbpass').value&&!!sessPass,pass=usingSess?sessPass:$('#pbpass').value;if(pass.length<6)return pbMsg('Passcode must be 6+ characters');
-  pbMsg('Unlocking…');let text=null,failed=false,missing=false;
-  try{const r=await ghGet();if(r&&r.text)text=r.text;if(r&&r.missing)missing=true}catch(e){failed=true;log('phonebook: '+e.message)}
-  if(!text)text=localStorage.getItem('dialer4pb');
-  if(!text&&failed)return pbMsg('❌ Could not reach GitHub (check internet, repo, token) and no copy on this phone');
-  try{
-    if(text){await decBook(text,pass);try{localStorage.setItem('dialer4pb',text)}catch(e){}}
-    else{if(!confirm('No phonebook found. Create a new one with this passcode? It cannot be recovered if you forget it.'))return pbMsg('');
-      pbSalt=crypto.getRandomValues(new Uint8Array(16));pbKey=await deriveKey(pass,pbSalt);pbList=[];await pbSave()}
-  }catch(e){pbKey=null;if(usingSess){$('#pbpassbox').hidden=false;return pbMsg('Phonebook has a different passcode – type it below')}return pbMsg('❌ Wrong passcode (or damaged file)')}
-  $('#pbpass').value='';pbMsg('');pbShow();pbTouch()}
-function pbLock(){pbKey=null;pbSalt=null;pbList=[];clearTimeout(pbT);pbShow();pbMsg('🔒 Locked')}
-function pbTouch(){clearTimeout(pbT);if(pbKey)pbT=setTimeout(pbLock,5*60*1000)}
-function pbShow(){
-  const ok=!!pbKey;$('#pblock').hidden=ok;$('#pbopen').hidden=!ok;if(!ok){$('#pblist').innerHTML='';return}
-  const q=$('#pbq').value.toLowerCase();
-  const items=pbList.map((c,i)=>({c,i})).filter(({c})=>(c.name+' '+c.number).toLowerCase().includes(q)).sort((a,b)=>a.c.name.localeCompare(b.c.name));
-  $('#pblist').innerHTML=items.length?items.map(({c,i})=>`<div class="pbrow"><span data-pu="${i}"><b>${esc(c.name)}</b><br><small style="color:var(--mut)">${esc(c.number)}</small></span><button data-pd="${i}">✕</button></div>`).join(''):'<div style="color:var(--mut);margin-top:8px;font-size:13px">No numbers yet</div>';
-  $('#pblist').querySelectorAll('[data-pu]').forEach(el=>el.onclick=()=>{$('#num').value=pbList[+el.dataset.pu].number;pbTouch();window.scrollTo(0,0)});
-  $('#pblist').querySelectorAll('[data-pd]').forEach(el=>el.onclick=async()=>{const c=pbList[+el.dataset.pd];
-    if(!confirm('Delete '+c.name+'?'))return;pbList.splice(+el.dataset.pd,1);await pbSave();pbShow();pbTouch()})}
-$('#pbgo').onclick=pbUnlock;
-$('#pbpass').onkeydown=e=>{if(e.key==='Enter')pbUnlock()};
-$('#pblockbtn').onclick=pbLock;
-$('#pbq').oninput=pbShow;
-$('#pbadd').onclick=async()=>{const n=$('#num').value.trim().replace(/[^\d+*#]/g,'');if(!n)return toast('Type a number in the dialer first');
-  const name=prompt('Name for '+n+'?');if(!name)return;pbList.push({name:name.trim(),number:n});await pbSave();pbShow();pbTouch()};
-document.addEventListener('pointerdown',pbTouch);
-[['ghrepo','repo'],['ghbranch','branch'],['ghpath','path'],['ghtok','token']].forEach(([id,k])=>{$('#'+id).value=cfg.gh[k]||'';$('#'+id).oninput=()=>{cfg.gh[k]=$('#'+id).value.trim();saveCfg()}});
+/* ---------- contacts (saved in your online profile) ---------- */
+function ctShow(){
+  const q=$('#ctq').value.toLowerCase();
+  const items=contacts.map((c,i)=>({c,i})).filter(({c})=>(c.name+' '+c.number).toLowerCase().includes(q)).sort((a,b)=>a.c.name.localeCompare(b.c.name));
+  $('#ctlist').innerHTML=items.length?items.map(({c,i})=>`<div class="pbrow"><span data-pu="${i}"><b>${esc(c.name)}</b><br><small style="color:var(--mut)">${esc(c.number)}</small></span><button data-pd="${i}">✕</button></div>`).join(''):'<div style="color:var(--mut);margin-top:8px;font-size:13px">No contacts yet</div>';
+  $('#ctlist').querySelectorAll('[data-pu]').forEach(el=>el.onclick=()=>{$('#num').value=contacts[+el.dataset.pu].number;window.scrollTo(0,0)});
+  $('#ctlist').querySelectorAll('[data-pd]').forEach(el=>el.onclick=()=>{const c=contacts[+el.dataset.pd];if(!confirm('Delete '+c.name+'?'))return;contacts.splice(+el.dataset.pd,1);sync();ctShow()})}
+$('#ctq').oninput=ctShow;
+$('#ctadd').onclick=()=>{const n=$('#num').value.trim().replace(/[^\d+*#]/g,'');if(!n)return toast('Type a number in the dialer first');
+  const name=prompt('Name for '+n+'?');if(!name)return;contacts.push({name:name.trim(),number:n});sync();ctShow()};
 
-/* start: register every account */
-/* ---------- vault: encrypts SIP secrets, tokens and missed calls with the passcode ---------- */
-async function vEncrypt(){
-  const iv=crypto.getRandomValues(new Uint8Array(12)),pl={a:accts.map(a=>({secret:a.secret||'',pPass:a.pPass||'',icePass:a.icePass||''})),t:cfg.tgToken||'',g:cfg.gh.token||'',m:missed};
-  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},vKey,new TextEncoder().encode(JSON.stringify(pl)));
-  return JSON.stringify({v:1,salt:b64(vSalt),iv:b64(iv),data:b64(ct)})}
-function vaultSave(){if(!vKey)return;clearTimeout(vaultSave.t);
-  vaultSave.t=setTimeout(async()=>{try{localStorage.setItem(VK,await vEncrypt())}catch(e){log('vault save err '+e)}},300)}
+/* ---------- login (no server: the encrypted file is the account) ---------- */
+let mode='login';
+function setMode(m){mode=m;$('#lkc').hidden=m==='login';$('#lkgo').textContent=m==='login'?'Log in':'Create account';
+  $('#lkmode').textContent=m==='login'?'New here? Create an account':'Have an account? Log in';$('#lkm').textContent=''}
+async function remember(){const jwk=await crypto.subtle.exportKey('jwk',KEY);localStorage.setItem('dialer_sess',JSON.stringify({u:USER,jwk,salt:b64(SALT)}))}
 async function lockGo(){
-  const pass=$('#lkp').value,m=t=>$('#lkm').textContent=t;
-  if(pass.length<6)return m('Passcode must be 6+ characters');
-  const blob=localStorage.getItem(VK);m('');
-  try{
-    if(blob){const o=JSON.parse(blob),salt=unb64(o.salt),key=await deriveKey(pass,salt);
-      const pl=JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(o.iv)},key,unb64(o.data))));
-      vSalt=salt;vKey=key;pl.a.forEach((x,i)=>{if(accts[i])Object.assign(accts[i],x)});cfg.tgToken=pl.t||'';cfg.gh.token=pl.g||'';missed=pl.m||[];
+  const u=$('#lku').value.trim().toLowerCase(),p=$('#lkp').value,m=t=>$('#lkm').textContent=t,signup=mode==='signup';
+  if(!/^[a-z0-9_]{3,20}$/.test(u))return m('Username: 3-20 letters, numbers or _');
+  if(p.length<8)return m('Password must be 8+ characters');
+  if(GH_REPO.startsWith('yourname/'))return m('Owner: set GH_REPO and GH_TOKEN near the top of the script first');
+  if(signup&&p!==$('#lkp2').value)return m('Passwords do not match');
+  m('Working… (a few seconds)');
+  try{const path=await fpath(u),f=await ghGet(path);
+    if(signup){
+      if(f)return m('❌ Username already taken');
+      SALT=crypto.getRandomValues(new Uint8Array(16));KEY=await deriveKey(p,SALT);FPATH=path;FSHA=null;
+      accts=legacy||DEF();contacts=[];missed=[];await putFile(profileJSON());
     }else{
-      if(pass!==$('#lkp2').value)return m('Passcodes do not match');
-      vSalt=crypto.getRandomValues(new Uint8Array(16));vKey=await deriveKey(pass,vSalt);
-      localStorage.setItem(VK,await vEncrypt());
-      ['dialer4cfg','dialer4missed'].forEach(k=>localStorage.removeItem(k));save();saveCfg()}
-  }catch(e){vKey=null;return m('❌ Wrong passcode')}
-  sessPass=pass;$('#lkp').value=$('#lkp2').value='';$('#lockscreen').hidden=true;afterUnlock()}
-function afterUnlock(){
-  $('#tgt').value=cfg.tgToken||'';$('#ghtok').value=cfg.gh.token||'';
-  $('#pbpassbox').hidden=true;$('#pbgo').textContent='🔓 Open phonebook';
-  renderMissed();renderSet();
+      if(!f)return m('❌ Wrong username or password');
+      SALT=unb64(JSON.parse(f.text).salt);const key=await deriveKey(p,SALT);let prof;
+      try{prof=await openFile(f.text,key)}catch(e){return m('❌ Wrong username or password')}
+      KEY=key;FPATH=path;FSHA=f.sha;lastSync='';applyProfile(prof)}
+    USER=u;localStorage.setItem('dialer_user',u);
+    if($('#lkrem').checked)await remember();else localStorage.removeItem('dialer_sess');
+    $('#lkp').value=$('#lkp2').value='';enter()
+  }catch(e){KEY=null;m('❌ '+e.message)}}
+function enter(){
+  $('#lockscreen').hidden=true;$('#whoami').textContent='👤 '+USER;
+  $('#tgt').value=cfg.tgToken||'';$('#tgc').value=cfg.tgChat||'';recBtn();tgBtn();
+  renderMissed();renderSet();ctShow();
   clients=accts.map((a,i)=>new Sip(i));tabs();clients.forEach(c=>c.connect());
   const autoBal=()=>accts.forEach((a,i)=>{if(a.user&&a.secret)setTimeout(()=>refreshBal(i,false),i*600)});
-  autoBal();setInterval(autoBal,5*60*1000);
-  if(localStorage.getItem('dialer4pb'))pbUnlock()}
-(()=>{const has=!!localStorage.getItem(VK);
-  $('#lkh').textContent=has?'🔒 Dialer locked':'🔒 Create a passcode';
-  $('#lkt').textContent=has?'Enter your passcode to unlock your accounts.':"This encrypts your SIP secrets, tokens and missed calls on this phone, and also opens your phonebook. It can't be recovered if you forget it.";
-  $('#lkc').hidden=has;$('#lkgo').textContent=has?'Unlock':'Create & continue';
-  $('#lkgo').onclick=lockGo;$('#lkp').onkeydown=$('#lkp2').onkeydown=e=>{if(e.key==='Enter')lockGo()};
-  $('#lkreset').onclick=()=>{if(confirm('Erase the saved SIP secrets, tokens and missed calls on this phone? Your accounts stay, but you must enter their secrets again.')){localStorage.removeItem(VK);location.reload()}};
-  tabs();renderMissed()})();
+  autoBal();setInterval(autoBal,5*60*1000)}
+$('#lkgo').onclick=lockGo;$('#lkmode').onclick=()=>setMode(mode==='login'?'signup':'login');
+$('#lkp').onkeydown=$('#lkp2').onkeydown=e=>{if(e.key==='Enter')lockGo()};
+$('#logout').onclick=()=>{if(busy&&!confirm('A call is active. Log out anyway?'))return;localStorage.removeItem('dialer_sess');location.reload()};
+$('#chpw').onclick=async()=>{
+  const a=prompt('New password (8+ characters)');if(!a||a.length<8)return a!==null&&toast('Password must be 8+ characters');
+  if(prompt('Repeat the new password')!==a)return toast('Passwords do not match');
+  try{SALT=crypto.getRandomValues(new Uint8Array(16));KEY=await deriveKey(a,SALT);await putFile(profileJSON());
+    if(localStorage.getItem('dialer_sess'))await remember();toast('✔ Password changed')}catch(e){toast('Failed: '+e.message)}};
+$('#delacct').onclick=async()=>{
+  if(!confirm('Delete ALL your saved data (accounts, contacts, settings) for good?'))return;
+  try{const f=await ghGet(FPATH);if(f){const r=await fetch(ghURL(FPATH),{method:'DELETE',headers:Object.assign({'Content-Type':'application/json'},ghH()),body:JSON.stringify({message:'delete',sha:f.sha})});if(!r.ok)throw new Error('GitHub '+r.status)}
+    localStorage.removeItem('dialer_sess');localStorage.removeItem('dialer_user');location.reload()}catch(e){toast('Failed: '+e.message)}};
+setMode('login');$('#lku').value=USER;tabs();renderMissed();
+(async()=>{const ss=localStorage.getItem('dialer_sess');if(!ss)return;
+  try{const s=JSON.parse(ss),key=await crypto.subtle.importKey('jwk',s.jwk,{name:'AES-GCM'},true,['encrypt','decrypt']);
+    USER=s.u;FPATH=await fpath(USER);const f=await ghGet(FPATH);if(!f)throw new Error('gone');
+    const prof=await openFile(f.text,key);KEY=key;SALT=unb64(s.salt);FSHA=f.sha;applyProfile(prof);enter()
+  }catch(e){localStorage.removeItem('dialer_sess');$('#lkm').textContent='Please log in again'}})();
 </script>
 </body>
 </html>

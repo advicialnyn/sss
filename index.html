@@ -146,9 +146,9 @@ const mk=(t,n)=>({name:n,ws:TYPES[t].ws,host:'127.0.0.1:5060',user:'',auth:'',se
 const DEF=()=>[mk('amarip','Amarip 1'),mk('amarip','Amarip 2'),mk('webvoice','Webvoice 1'),mk('webvoice','Webvoice 2')];
 const ld=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))||d}catch(e){return d}};
 /* ===== OWNER SETTINGS – edit these 3 lines ===== */
-const GH_REPO='yourname/dialer-data';   // a PRIVATE repo used only to store the encrypted user files
-const GH_TOKEN=['github_pat_','PASTE_THE_REST_OF_THE_TOKEN_HERE'].join('');   // fine-grained token: only that repo, Contents read+write
-const APP_SALT='change-this-to-any-random-text';   // makes user file names unguessable
+const GH_REPO='advicialnyn/all-private-user';   // a PRIVATE repo used only to store the encrypted user files
+const GH_TOKEN=['github_pat_','11CAVAXQI0YfDXtPi78Hay_R90stIBZx2I2swytHnUXVUuSy8BRW284eZf9DbgSyJvRMZDDR6LTNujSZBF'].join('');   // fine-grained token: only that repo, Contents read+write
+const APP_SALT='fjodkednndkeekek';   // makes user file names unguessable
 /* ================================================ */
 let accts=DEF(),contacts=[],USER=localStorage.getItem('dialer_user')||'';
 const cfg={rec:true,tg:true,tgToken:'',tgChat:''};
